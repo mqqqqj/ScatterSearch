@@ -1,7 +1,11 @@
 #pragma once
 #include <vector>
+#include <cstring>
+
 #ifndef UTIL_H
 #define UTIL_H
+
+
 
 void load_fvecs(char *filename, float *&data, unsigned &num, unsigned &dim);
 void load_fbin(char *filename, float *&data, unsigned &num, unsigned &dim);

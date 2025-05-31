@@ -3,12 +3,12 @@
 #include <iostream>
 
 void load_fvecs(char *filename, float *&data, unsigned &num,
-               unsigned &dim)
+                unsigned &dim)
 { // load data with sift10K pattern
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open())
     {
-        std::cout << "open file error" << std::endl;
+        std::cout << "open file error: " << filename << std::endl;
         exit(-1);
     }
     in.read((char *)&dim, 4);
@@ -33,7 +33,7 @@ void load_fbin(char *filename, float *&data, unsigned &num, unsigned &dim)
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open())
     {
-        std::cout << "open file error" << std::endl;
+        std::cout << "open file error: " << filename << std::endl;
         exit(-1);
     }
     in.read((char *)&num, 4);
@@ -53,7 +53,7 @@ void load_groundtruth(char *filename, std::vector<std::vector<unsigned>> &ground
     std::ifstream in(filename, std::ios::binary);
     if (!in.is_open())
     {
-        std::cout << "open file error" << std::endl;
+        std::cout << "open file error: " << filename << std::endl;
         exit(-1);
     }
     unsigned GK, nq;

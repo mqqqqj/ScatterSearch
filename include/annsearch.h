@@ -23,12 +23,31 @@ struct CompareByFirst
     }
 };
 
+struct Neighbor
+{
+    unsigned id;
+    float distance;
+    bool unexplored;
+    Neighbor() = default;
+    Neighbor(unsigned id, float distance, bool unexplored) : id{id}, distance{distance}, unexplored(unexplored) {}
+    inline bool operator<(const Neighbor &other) const
+    {
+        return distance < other.distance;
+    }
+};
+
 class ANNSearch
 {
 public:
     ANNSearch(unsigned dim, unsigned num, float *base, Metric m);
     void LoadGraph(const char *filename);
     void Search(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+
+private:
+    double get_time_mark();
+    inline int InsertIntoPool(Neighbor *addr, unsigned K, Neighbor nn);
 
 private:
     unsigned default_ep;

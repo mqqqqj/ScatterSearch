@@ -13,10 +13,10 @@ int main(int argc, char **argv)
     limit.rlim_max = 0;
     setrlimit(RLIMIT_CORE, &limit);
     srand(time(0));
-    if (argc != 7)
+    if (argc != 8)
     {
         std::cout << argv[0]
-                  << " data_file query_file nsg_path search_L search_K gt_path"
+                  << " data_file query_file nsg_path search_L search_K num_threads gt_path"
                   << std::endl;
         exit(-1);
     }
@@ -29,8 +29,9 @@ int main(int argc, char **argv)
     assert(dim == query_dim);
     int L = atoi(argv[4]);
     int K = atoi(argv[5]);
+    int num_threads = atoi(argv[6]);
     std::vector<std::vector<unsigned>> groundtruth;
-    load_groundtruth(argv[6], groundtruth);
+    load_groundtruth(argv[7], groundtruth);
     std::cout << "Groundtruth loaded" << std::endl;
     if (L < K)
     {
@@ -46,7 +47,9 @@ int main(int argc, char **argv)
     {
         std::vector<unsigned> tmp(K);
         auto start_time = std::chrono::high_resolution_clock::now();
-        engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
+        // engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
+        // engine.MultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+        engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
         flags.reset();
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
