@@ -180,6 +180,17 @@ void ANNSearch::MultiThreadSearch(const float *query, unsigned query_id, int K, 
         ndc_thread[i] = 1;
         candidate_set.emplace(-lowerBound, ep);
         flags[ep] = true;
+        while (top_candidates.size() < K)
+        {
+            int id = rand() % base_num;
+            while (flags[id])
+                id = rand() % base_num;
+            float dist = distance_func(base_data + dimension * id, query, dimension); // note that distance = -inner product, smaller is better
+            ndc_thread[i] += 1;
+            candidate_set.emplace(-dist, id);
+            top_candidates.emplace(dist, id);
+            flags[id] = true;
+        }
         while (!candidate_set.empty())
         {
             // if (finish_num >= num_threads / 2)
@@ -258,9 +269,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 {
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     int finish_num = 0;
-#pragma omp parallel for num_threads(num_threads)
-    for (int i = 0; i < num_threads; i++)
+#pragma omp parallel num_threads(num_threads)
     {
+        int i = omp_get_thread_num();
         int ep = rand() % base_num;
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
@@ -269,45 +280,37 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             init_ids[tmp_l] = graph[ep][tmp_l];
             flags[init_ids[tmp_l]] = true;
         }
-
-        while (tmp_l < L)
-        {
-            unsigned id = rand() % base_num;
-            if (flags[id])
-                continue;
-            flags[id] = true;
-            init_ids[tmp_l] = id;
-            tmp_l++;
-        }
         retsets[i].resize(L + 1);
-        for (unsigned j = 0; j < init_ids.size(); j++)
+        for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
             float dist = distance_func(base_data + dimension * id, query, dimension);
             retsets[i][j] = Neighbor(id, dist, true);
         }
-        std::sort(retsets[i].begin(), retsets[i].begin() + L); // sort the retset by distance in ascending order
+        std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
         int k = 0;
         while (k < (int)L)
         {
             int nk = L;
-            // if(finish_num >= num_threads / 2)
-            //   break;
+            if (finish_num >= num_threads / 2)
+                break;
             if (retsets[i][k].unexplored)
             {
                 retsets[i][k].unexplored = false;
-                unsigned n = retsets[i][k].id; // current node
+                unsigned n = retsets[i][k].id;
                 for (unsigned m = 0; m < graph[n].size(); ++m)
                 {
                     unsigned id = graph[n][m];
                     if (flags[id])
                         continue;
-                    flags[id] = 1;
+                    flags[id] = true;
                     float dist = distance_func(query, base_data + dimension * id, dimension);
-                    if (dist >= retsets[i][L - 1].distance)
+                    if (dist >= retsets[i][tmp_l - 1].distance)
                         continue;
                     Neighbor nn(id, dist, true);
-                    int r = InsertIntoPool(retsets[i].data(), L, nn);
+                    int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
+                    if (tmp_l < L)
+                        tmp_l++;
                     if (r < nk)
                         nk = r;
                 }
@@ -329,5 +332,195 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     for (size_t i = 0; i < K; i++)
     {
         indices[i] = retsets[0][i].id;
+    }
+}
+
+void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
+{
+    std::vector<std::vector<Neighbor>> retsets(num_threads);
+    std::vector<std::vector<Neighbor>> new_retsets(num_threads);
+    int finish_num = 0;
+    std::atomic<float> best_dist;
+    best_dist = 1000;
+    int best_thread_id = -1;
+    std::atomic<bool> best_thread_finish;
+    best_thread_finish = false;
+#pragma omp parallel num_threads(num_threads)
+    {
+        int i = omp_get_thread_num();
+        int ep = rand() % base_num;
+        int hop = 0;
+        std::vector<unsigned> init_ids(L);
+        unsigned tmp_l = 0;
+        for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
+        {
+            init_ids[tmp_l] = graph[ep][tmp_l];
+            flags[init_ids[tmp_l]] = true;
+        }
+        retsets[i].resize(L + 1);
+        for (unsigned j = 0; j < tmp_l; j++)
+        {
+            unsigned id = init_ids[j];
+            float dist = distance_func(base_data + dimension * id, query, dimension);
+            retsets[i][j] = Neighbor(id, dist, true);
+        }
+        std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
+        int k = 0;
+        while (k < (int)L)
+        {
+            int nk = L;
+            if (best_thread_finish)
+                break;
+            if (hop == 100)
+            {
+                if (best_dist > retsets[i][0].distance)
+                {
+                    best_dist = retsets[i][0].distance;
+                    best_thread_id = i;
+                }
+            }
+            if (retsets[i][k].unexplored)
+            {
+                retsets[i][k].unexplored = false;
+                unsigned n = retsets[i][k].id;
+                for (unsigned m = 0; m < graph[n].size(); ++m)
+                {
+                    unsigned id = graph[n][m];
+                    if (flags[id])
+                        continue;
+                    flags[id] = true;
+                    float dist = distance_func(query, base_data + dimension * id, dimension);
+                    if (dist >= retsets[i][tmp_l - 1].distance)
+                        continue;
+                    Neighbor nn(id, dist, true);
+                    int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
+                    if (tmp_l < L)
+                        tmp_l++;
+                    if (r < nk)
+                        nk = r;
+                }
+                hop++;
+            }
+            if (nk <= k)
+                k = nk;
+            else
+                ++k;
+        }
+        finish_num++;
+        if (i == best_thread_id)
+            best_thread_finish = true;
+        else
+        {
+            if (best_thread_finish == false)
+            {
+                std::vector<Neighbor> new_retset;
+                SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, flags, new_retset);
+                new_retsets[i] = new_retset;
+            }
+        }
+    }
+    for (int i = 1; i < num_threads; i++)
+    {
+        for (size_t j = 0; j < K; j++)
+        {
+            InsertIntoPool(retsets[0].data(), K, retsets[i][j]);
+        }
+    }
+    for (size_t i = 0; i < new_retsets.size(); i++)
+    {
+        if (new_retsets[i].size())
+            for (int j = 0; j < K; j++)
+            {
+                InsertIntoPool(retsets[0].data(), K, new_retsets[i][j]);
+            }
+    }
+    for (size_t i = 0; i < K; i++)
+    {
+        indices[i] = retsets[0][i].id;
+    }
+}
+
+void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::atomic<bool> &best_thread_finish, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors)
+{
+    std::vector<std::vector<Neighbor>> retsets;
+    std::vector<int> retset_size;
+    int current_turn = 0;
+    while (true)
+    {
+        if (best_thread_finish)
+        {
+            break;
+        }
+        std::vector<Neighbor> retset(L + 1);
+        retsets.push_back(retset);
+        retset_size.push_back(0);
+        int &tmp_l = retset_size[current_turn];
+        int ep = rand() % base_num;
+        for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
+        {
+            unsigned id = graph[ep][tmp_l];
+            if (flags[id])
+                continue;
+            flags[id] = true;
+            float dist = distance_func(base_data + dimension * id, query, dimension);
+            retsets[current_turn][tmp_l] = Neighbor(id, dist, true);
+        }
+        std::sort(retsets[current_turn].begin(), retsets[current_turn].begin() + tmp_l);
+        int k = 0;
+        int hop = 0;
+        while ((k < (int)L))
+        {
+            int nk = L;
+            if (best_thread_finish)
+                break;
+            if (retsets[current_turn][k].unexplored)
+            {
+                retsets[current_turn][k].unexplored = false;
+                unsigned n = retsets[current_turn][k].id;
+                for (unsigned m = 0; m < graph[n].size(); ++m)
+                {
+                    unsigned id = graph[n][m];
+                    if (flags[id])
+                        continue;
+                    flags[id] = true;
+                    float dist = distance_func(base_data + dimension * id, query, dimension);
+                    if (dist >= retsets[current_turn][tmp_l - 1].distance)
+                        continue;
+                    Neighbor nn(id, dist, true);
+                    int r = InsertIntoPool(retsets[current_turn].data(), tmp_l, nn);
+                    if (tmp_l < L)
+                        tmp_l++;
+                    if (r < nk)
+                        nk = r;
+                }
+                hop++;
+            }
+            if (nk <= k)
+                k = nk;
+            else
+                ++k;
+        }
+        current_turn++;
+    }
+    int master = -1;
+    for (size_t i = 0; i < retsets.size(); i++)
+    {
+        if (retset_size[i] >= K)
+            master = i;
+    }
+    if (master != -1)
+    {
+        for (size_t i = 0; i < retsets.size(); i++)
+        {
+            for (size_t j = 0; j < retset_size[i]; j++)
+            {
+                InsertIntoPool(retsets[master].data(), K, retsets[i][j]);
+            }
+        }
+        neighbors.resize(K);
+        for (size_t i = 0; i < K; i++)
+        {
+            neighbors[i] = retsets[master][i];
+        }
     }
 }

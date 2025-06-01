@@ -5,6 +5,7 @@
 #include <vector>
 #include <queue>
 #include <iostream>
+#include <atomic>
 #include <boost/dynamic_bitset.hpp>
 #include <distance.h>
 
@@ -44,6 +45,8 @@ public:
     void Search(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::atomic<bool> &best_thread_finish, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors);
 
 private:
     double get_time_mark();

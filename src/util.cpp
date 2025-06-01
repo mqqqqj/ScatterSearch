@@ -69,15 +69,15 @@ void load_groundtruth(char *filename, std::vector<std::vector<unsigned>> &ground
     in.close();
 }
 
-void save_result(char *filename, std::vector<std::vector<unsigned>> &results)
+void save_results(const std::vector<test_result> &results, char *filename)
 {
-    std::ofstream out(filename, std::ios::binary | std::ios::out);
-
+    std::ofstream file(filename);
     for (unsigned i = 0; i < results.size(); i++)
     {
-        unsigned GK = (unsigned)results[i].size();
-        out.write((char *)&GK, sizeof(unsigned));
-        out.write((char *)results[i].data(), GK * sizeof(unsigned));
+        file << results[i].L << "," << results[i].throughput << ","
+             << results[i].latency << "," << results[i].recall << ","
+             << results[i].std_recall << "," << results[i].p99_recall << ","
+             << results[i].p95_recall << std::endl;
     }
-    out.close();
+    file.close();
 }
