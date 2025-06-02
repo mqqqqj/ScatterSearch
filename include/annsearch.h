@@ -8,6 +8,7 @@
 #include <atomic>
 #include <boost/dynamic_bitset.hpp>
 #include <distance.h>
+#include <util.h>
 
 enum Metric
 {
@@ -24,19 +25,6 @@ struct CompareByFirst
     }
 };
 
-struct Neighbor
-{
-    unsigned id;
-    float distance;
-    bool unexplored;
-    Neighbor() = default;
-    Neighbor(unsigned id, float distance, bool unexplored) : id{id}, distance{distance}, unexplored(unexplored) {}
-    inline bool operator<(const Neighbor &other) const
-    {
-        return distance < other.distance;
-    }
-};
-
 class ANNSearch
 {
 public:
@@ -44,6 +32,8 @@ public:
     void LoadGraph(const char *filename);
     void LoadGroundtruth(const char *filename);
     void Search(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void SearchArraySimulation(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void SearchArraySimulationForPipeline(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &indices);
     void MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
@@ -51,7 +41,6 @@ public:
 
 private:
     double get_time_mark();
-    inline int InsertIntoPool(Neighbor *addr, unsigned K, Neighbor nn);
 
 private:
     unsigned default_ep;

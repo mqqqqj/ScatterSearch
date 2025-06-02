@@ -47,14 +47,14 @@ int main(int argc, char **argv)
     boost::dynamic_bitset<> flags{points_num, 0};
     std::vector<std::vector<unsigned>> res(query_num);
     std::vector<float> latency_list(query_num); // 单位：毫秒
+    auto s = std::chrono::high_resolution_clock::now();
     for (unsigned i = 0; i < query_num; i++)
     {
         std::vector<unsigned> tmp(K);
         auto start_time = std::chrono::high_resolution_clock::now();
-        // engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
         // engine.MultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+        engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+        // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
         flags.reset();
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -65,6 +65,10 @@ int main(int argc, char **argv)
             std::cout << "query " << i << " done" << std::endl;
         }
     }
+    auto e = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = e - s;
+    std::cout << "Throughput(QPS): " << query_num / diff.count() << std::endl;
+    std::cout << "Query time(s): " << diff.count() << std::endl;
     // 计算平均latency
     float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
     float avg_latency = accumulate_latency / latency_list.size();

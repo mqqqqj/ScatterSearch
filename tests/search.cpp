@@ -46,7 +46,8 @@ int main(int argc, char **argv)
     {
         std::vector<unsigned> tmp(K);
         auto start_time = std::chrono::high_resolution_clock::now();
-        engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
+        // engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
+        engine.SearchArraySimulation(query_load + (size_t)i * dim, i, K, L, flags, tmp);
         flags.reset();
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);

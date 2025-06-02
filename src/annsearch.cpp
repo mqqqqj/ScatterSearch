@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <sys/time.h>
 #include <omp.h>
-#include <util.h>
+
 
 #define BREAKDOWN_PRINT
 
@@ -68,46 +68,6 @@ double ANNSearch::get_time_mark()
     timeval t;
     gettimeofday(&t, nullptr);
     return t.tv_sec + t.tv_usec * 0.000001;
-}
-
-inline int ANNSearch::InsertIntoPool(Neighbor *addr, unsigned K, Neighbor nn)
-{
-    // find the location to insert
-    int left = 0, right = K - 1;
-    if (addr[left].distance > nn.distance)
-    {
-        memmove((char *)&addr[left + 1], &addr[left], K * sizeof(Neighbor));
-        addr[left] = nn;
-        return left;
-    }
-    if (addr[right].distance < nn.distance)
-    {
-        addr[K] = nn;
-        return K;
-    }
-    while (left < right - 1)
-    {
-        int mid = (left + right) / 2;
-        if (addr[mid].distance > nn.distance)
-            right = mid;
-        else
-            left = mid;
-    }
-    // check equal ID
-
-    while (left > 0)
-    {
-        if (addr[left].distance < nn.distance)
-            break;
-        if (addr[left].id == nn.id)
-            return K + 1;
-        left--;
-    }
-    if (addr[left].id == nn.id || addr[right].id == nn.id)
-        return K + 1;
-    memmove((char *)&addr[right + 1], &addr[right], (K - right) * sizeof(Neighbor));
-    addr[right] = nn;
-    return right;
 }
 
 void ANNSearch::Search(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
@@ -181,6 +141,126 @@ void ANNSearch::Search(const float *query, unsigned query_id, int K, int L, boos
         top_candidates.pop();
     }
 }
+
+void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
+{
+    int ep = rand() % base_num;
+    std::vector<unsigned> init_ids(L);
+    unsigned tmp_l = 0;
+    for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
+    {
+        init_ids[tmp_l] = graph[ep][tmp_l];
+        flags[init_ids[tmp_l]] = true;
+    }
+    std::vector<Neighbor> retset(L + 1);
+    for (unsigned j = 0; j < tmp_l; j++)
+    {
+        unsigned id = init_ids[j];
+        _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
+        float dist = distance_func(base_data + dimension * id, query, dimension);
+        retset[j] = Neighbor(id, dist, true);
+    }
+    std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
+    int k = 0;
+    while (k < (int)L)
+    {
+        int nk = L;
+        if (retset[k].unexplored)
+        {
+            retset[k].unexplored = false;
+            unsigned n = retset[k].id;
+            _mm_prefetch(graph[n].data(), _MM_HINT_T0);
+            for (unsigned m = 0; m < graph[n].size(); ++m)
+            {
+                unsigned id = graph[n][m];
+                if (m + 1 < graph[n].size()) {
+                    _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                }
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                float dist = distance_func(query, base_data + dimension * id, dimension);
+                if (dist >= retset[tmp_l - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                if (tmp_l < L)
+                    tmp_l++;
+                if (r < nk)
+                    nk = r;
+            }
+        }
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
+    }
+    for (size_t i = 0; i < K; i++)
+    {
+        indices[i] = retset[i].id;
+    }
+}
+
+void ANNSearch::SearchArraySimulationForPipeline(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &indices)
+{
+    int ep = rand() % base_num;
+    std::vector<unsigned> init_ids(L);
+    unsigned tmp_l = 0;
+    for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
+    {
+        init_ids[tmp_l] = graph[ep][tmp_l];
+        flags[init_ids[tmp_l]] = true;
+    }
+    std::vector<Neighbor> retset(L + 1);
+    for (unsigned j = 0; j < tmp_l; j++)
+    {
+        unsigned id = init_ids[j];
+        _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
+        float dist = distance_func(base_data + dimension * id, query, dimension);
+        retset[j] = Neighbor(id, dist, true);
+    }
+    std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
+    int k = 0;
+    while (k < (int)L)
+    {
+        int nk = L;
+        if (retset[k].unexplored)
+        {
+            retset[k].unexplored = false;
+            unsigned n = retset[k].id;
+            _mm_prefetch(graph[n].data(), _MM_HINT_T0);
+            for (unsigned m = 0; m < graph[n].size(); ++m)
+            {
+                unsigned id = graph[n][m];
+                if (m + 1 < graph[n].size()) {
+                    _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                }
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                float dist = distance_func(query, base_data + dimension * id, dimension);
+                if (dist >= retset[tmp_l - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                if (tmp_l < L)
+                    tmp_l++;
+                if (r < nk)
+                    nk = r;
+            }
+        }
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
+    }
+    indices.resize(K);
+    for (size_t i = 0; i < K; i++)
+    {
+        indices[i] = retset[i];
+    }
+}
+
 void ANNSearch::MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
     std::vector<std::vector<Neighbor>> retsets(num_threads);
@@ -285,6 +365,7 @@ void ANNSearch::MultiThreadSearch(const float *query, unsigned query_id, int K, 
     }
 }
 
+
 void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
     std::vector<std::vector<Neighbor>> retsets(num_threads);
@@ -304,6 +385,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
+            _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
             float dist = distance_func(base_data + dimension * id, query, dimension);
             retsets[i][j] = Neighbor(id, dist, true);
         }
@@ -312,15 +394,19 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         while (k < (int)L)
         {
             int nk = L;
-            if (finish_num >= num_threads / 2)
-                break;
+            // if (finish_num >= num_threads / 2)
+            //     break;
             if (retsets[i][k].unexplored)
             {
                 retsets[i][k].unexplored = false;
                 unsigned n = retsets[i][k].id;
+                _mm_prefetch(graph[n].data(), _MM_HINT_T0);
                 for (unsigned m = 0; m < graph[n].size(); ++m)
                 {
                     unsigned id = graph[n][m];
+                    if (m + 1 < graph[n].size()) {
+                        _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                    }
                     if (flags[id])
                         continue;
                     flags[id] = true;

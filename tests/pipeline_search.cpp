@@ -45,26 +45,77 @@ int main(int argc, char **argv)
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-    boost::dynamic_bitset<> flags{points_num, 0};
-    std::vector<std::vector<unsigned>> res(query_num);
     std::vector<float> latency_list(query_num); // 单位：毫秒
+    ThreadPool pool(num_threads);
+    std::vector<std::future<void>> futures;
+    std::vector<std::vector<std::vector<Neighbor>>> res(query_num, std::vector<std::vector<Neighbor>>(num_threads));
+    std::vector<std::vector<std::chrono::high_resolution_clock::time_point>> query_start_times(query_num, std::vector<std::chrono::high_resolution_clock::time_point>(num_threads));
+    std::vector<std::vector<std::chrono::high_resolution_clock::time_point>> query_end_times(query_num, std::vector<std::chrono::high_resolution_clock::time_point>(num_threads));
+    int master_thread[query_num];
+    memset(master_thread, -1, sizeof(int) * query_num);
+    std::atomic<int> finish_num[query_num];
     for (unsigned i = 0; i < query_num; i++)
     {
-        std::vector<unsigned> tmp(K);
-        auto start_time = std::chrono::high_resolution_clock::now();
-        // engine.Search(query_load + (size_t)i * dim, i, K, L, flags, tmp);
-        // engine.MultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        flags.reset();
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-        latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
-        res[i] = tmp;
-        if (i % 1000 == 999)
+        finish_num[i] = 0;
+    }
+    auto s = std::chrono::high_resolution_clock::now();
+    int flag_pool_size = 20;
+    std::vector<boost::dynamic_bitset<>> flags(flag_pool_size);
+    for (unsigned i = 0; i < flag_pool_size; i++)
+    {
+        flags[i] = boost::dynamic_bitset<>(points_num, 0);
+    }
+    for (unsigned i = 0; i < query_num; i++)
+    {
+        float *query_ptr = query_load + (size_t)i * dim;
+        for (unsigned j = 0; j < num_threads; j++)
         {
-            std::cout << "query " << i << " done" << std::endl;
+            futures.push_back(pool.enqueue([&, i, j, query_ptr]()
+                                           {
+                    query_start_times[i][j] = std::chrono::high_resolution_clock::now();
+                    int flag_idx = i % flag_pool_size;
+                    engine.SearchArraySimulationForPipeline(query_load + (size_t)i * dim, i, K, L, flags[flag_idx], res[i][j]);
+                    finish_num[i] ++;
+                    if(finish_num[i] == num_threads)
+                    {
+                        flags[flag_idx].reset();
+                        // merge result
+                        int master = -1;
+                        for(unsigned t = 0; t < num_threads; t++)
+                            if(res[i][t].size())
+                                master = t;
+                        master_thread[i] = master;
+                        for (unsigned t = 0; t < num_threads; t++)
+                        {
+                            if(res[i][t].size() && t != master)
+                                for (unsigned k = 0; k < K; k++)
+                                {
+                                    InsertIntoPool(res[i][master].data(), K, res[i][t][k]);
+                                }
+                        }
+                    }
+                    query_end_times[i][j] = std::chrono::high_resolution_clock::now(); }));
         }
+    }
+    std::cout << "Waiting for all threads to finish" << std::endl;
+    for (size_t i = 0; i < futures.size(); i++)
+    {
+        futures[i].get();
+    }
+    std::cout << "All threads finished" << std::endl;
+    auto e = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = e - s;
+    std::cout << "Throughput(QPS): " << query_num / diff.count() << std::endl;
+    std::cout << "Query time(s): " << diff.count() << std::endl;
+    // 计算每个查询的延迟
+    for (unsigned i = 0; i < query_num; i++)
+    {
+        auto earliest_start = *std::min_element(query_start_times[i].begin(), query_start_times[i].end());
+        auto latest_end = *std::max_element(query_end_times[i].begin(), query_end_times[i].end());
+        latency_list[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                              latest_end - earliest_start)
+                              .count() /
+                          1000.0f;
     }
     // 计算平均latency
     float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
@@ -78,7 +129,7 @@ int main(int argc, char **argv)
         {
             for (unsigned g = 0; g < K; g++)
             {
-                if (res[i][j] == groundtruth[i][g])
+                if (res[i][master_thread[i]][j].id == groundtruth[i][g])
                 {
                     correct++;
                     break;
