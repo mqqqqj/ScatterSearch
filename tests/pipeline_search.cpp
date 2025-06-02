@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <chrono>
 #include <numeric>
+#include <ThreadPool.h>
 
 int main(int argc, char **argv)
 {

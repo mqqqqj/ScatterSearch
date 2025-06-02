@@ -42,6 +42,27 @@ void ANNSearch::LoadGraph(const char *filename)
     }
 }
 
+void ANNSearch::LoadGroundtruth(const char *filename)
+{
+    std::ifstream in(filename, std::ios::binary);
+    if (!in.is_open())
+    {
+        std::cout << "open file error: " << filename << std::endl;
+        exit(-1);
+    }
+    unsigned GK, nq;
+    in.read((char *)&nq, sizeof(unsigned));
+    in.read((char *)&GK, sizeof(unsigned));
+    std::cout << "nq: " << nq << ", GK: " << GK << std::endl;
+    for (unsigned i = 0; i < nq; i++)
+    {
+        std::vector<unsigned> result(GK);
+        in.read((char *)result.data(), GK * sizeof(unsigned));
+        groundtruth.push_back(result);
+    }
+    in.close();
+}
+
 double ANNSearch::get_time_mark()
 {
     timeval t;
@@ -162,7 +183,6 @@ void ANNSearch::Search(const float *query, unsigned query_id, int K, int L, boos
 }
 void ANNSearch::MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
-
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     int ndc_thread[num_threads];
     int finish_num = 0;
@@ -340,17 +360,26 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
     int finish_num = 0;
+    int best_thread_id = -1;
+    std::atomic<int> decide_num;
+    decide_num = 0;
     std::atomic<float> best_dist;
     best_dist = 1000;
-    int best_thread_id = -1;
     std::atomic<bool> best_thread_finish;
     best_thread_finish = false;
+    bool good_thread[num_threads];
+    memset(good_thread, 0, sizeof(bool) * num_threads);
+    std::atomic<int> good_thread_num;
+    good_thread_num = 0;
+    std::atomic<int> good_thread_finish_num;
+    good_thread_finish_num = 0;
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
         int ep = rand() % base_num;
         int hop = 0;
         std::vector<unsigned> init_ids(L);
+        bool need_identify = true;
         unsigned tmp_l = 0;
         for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
         {
@@ -371,12 +400,30 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 100)
+            if (hop == 10)
             {
+                decide_num++;
                 if (best_dist > retsets[i][0].distance)
                 {
                     best_dist = retsets[i][0].distance;
                     best_thread_id = i;
+                }
+            }
+            if (need_identify && decide_num == num_threads)
+            {
+                need_identify = false;
+                if (best_dist < 1.1 * retsets[i][0].distance)
+                {
+                    // bad search, start a new one
+                    std::vector<Neighbor> new_retset;
+                    SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, best_dist, flags, new_retset);
+                    new_retsets[i] = new_retset;
+                    break;
+                }
+                if (best_dist > 1.02 * retsets[i][0].distance)
+                {
+                    good_thread_num++;
+                    good_thread[i] = true;
                 }
             }
             if (retsets[i][k].unexplored)
@@ -407,17 +454,23 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                 ++k;
         }
         finish_num++;
-        if (i == best_thread_id)
-            best_thread_finish = true;
-        else
+        if (good_thread[i])
         {
-            if (best_thread_finish == false)
-            {
-                std::vector<Neighbor> new_retset;
-                SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, flags, new_retset);
-                new_retsets[i] = new_retset;
-            }
+            good_thread_finish_num++;
         }
+        if (good_thread_finish_num == good_thread_num)
+            best_thread_finish = true;
+        // if (i == best_thread_id)
+        //     best_thread_finish = true;
+        // else
+        // {
+        // if (best_thread_finish == false)
+        // {
+        //     std::vector<Neighbor> new_retset;
+        //     SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, best_dist, flags, new_retset);
+        //     new_retsets[i] = new_retset;
+        // }
+        // }
     }
     for (int i = 1; i < num_threads; i++)
     {
@@ -440,12 +493,12 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     }
 }
 
-void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::atomic<bool> &best_thread_finish, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors)
+void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors)
 {
     std::vector<std::vector<Neighbor>> retsets;
     std::vector<int> retset_size;
     int current_turn = 0;
-    while (true)
+    while (current_turn < 10) // true
     {
         if (best_thread_finish)
         {
@@ -473,6 +526,10 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
             int nk = L;
             if (best_thread_finish)
                 break;
+            // if(hop == 10 && best_dist < 1.1 * retsets[current_turn][0].distance)
+            // {
+            //     break;
+            // }
             if (retsets[current_turn][k].unexplored)
             {
                 retsets[current_turn][k].unexplored = false;
@@ -500,6 +557,20 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
             else
                 ++k;
         }
+        // evaluate recall@100
+        // int correct = 0;
+        // for (int i = 0; i < K; i++)
+        // {
+        //     for (int j = 0; j < K; j++)
+        //     {
+        //         if (retsets[current_turn][i].id == groundtruth[query_id][j])
+        //         {
+        //             correct++;
+        //             break;
+        //         }
+        //     }
+        // }
+        // std::cout << "query " << query_id << ", turn " << current_turn << ", recall: " << (float)correct / K << std::endl;
         current_turn++;
     }
     int master = -1;

@@ -16,7 +16,7 @@ else()
     message(FATAL_ERROR "no OpenMP supprot")
 endif()
 
-add_definitions (-std=c++17 -Ofast -lboost -march=native -mavx -mavx2) #  -DINFO
+add_definitions (-std=c++17 -Ofast -lboost -march=native -mavx -mavx2 -fpic -w -ftree-vectorize -ftree-vectorizer-verbose=0) #  -DINFO
 
 add_subdirectory(src)
 add_subdirectory(tests)
