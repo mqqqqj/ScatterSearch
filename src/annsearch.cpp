@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <omp.h>
 
-
 #define BREAKDOWN_PRINT
 
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
@@ -173,7 +172,8 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
             for (unsigned m = 0; m < graph[n].size(); ++m)
             {
                 unsigned id = graph[n][m];
-                if (m + 1 < graph[n].size()) {
+                if (m + 1 < graph[n].size())
+                {
                     _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
                 }
                 if (flags[id])
@@ -232,7 +232,8 @@ void ANNSearch::SearchArraySimulationForPipeline(const float *query, unsigned qu
             for (unsigned m = 0; m < graph[n].size(); ++m)
             {
                 unsigned id = graph[n][m];
-                if (m + 1 < graph[n].size()) {
+                if (m + 1 < graph[n].size())
+                {
                     _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
                 }
                 if (flags[id])
@@ -248,6 +249,76 @@ void ANNSearch::SearchArraySimulationForPipeline(const float *query, unsigned qu
                 if (r < nk)
                     nk = r;
             }
+        }
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
+    }
+    indices.resize(K);
+    for (size_t i = 0; i < K; i++)
+    {
+        indices[i] = retset[i];
+    }
+}
+
+void ANNSearch::SearchArraySimulationForPipelineWithET(const float *query, unsigned query_id, int thread_id, int K, int L, boost::dynamic_bitset<> &flags,
+                                                       std::atomic<bool> &stop, std::atomic<float> &best_dist, std::atomic<int> &best_thread_id,
+                                                       std::vector<Neighbor> &indices)
+{
+    std::vector<Neighbor> retset(L + 1);
+    unsigned tmp_l = 0;
+    while (tmp_l < K)
+    {
+        int id = rand() % base_num;
+        while (flags[id])
+            id = rand() % base_num;
+        float dist = distance_func(base_data + dimension * id, query, dimension);
+        retset[tmp_l] = Neighbor(id, dist, true);
+        tmp_l++;
+    }
+    std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
+    int k = 0;
+    int hop = 0;
+    while (k < (int)L)
+    {
+        if (stop)
+            break;
+        if (hop == 10)
+        {
+            if (best_dist > retset[0].distance)
+            {
+                best_dist = retset[0].distance;
+                best_thread_id = thread_id;
+            }
+        }
+        int nk = L;
+        if (retset[k].unexplored)
+        {
+            retset[k].unexplored = false;
+            unsigned n = retset[k].id;
+            _mm_prefetch(graph[n].data(), _MM_HINT_T0);
+            for (unsigned m = 0; m < graph[n].size(); ++m)
+            {
+                unsigned id = graph[n][m];
+                if (m + 1 < graph[n].size())
+                {
+                    _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                }
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                float dist = distance_func(query, base_data + dimension * id, dimension);
+                if (dist >= retset[tmp_l - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                if (tmp_l < L)
+                    tmp_l++;
+                if (r < nk)
+                    nk = r;
+            }
+            hop++;
         }
         if (nk <= k)
             k = nk;
@@ -365,7 +436,6 @@ void ANNSearch::MultiThreadSearch(const float *query, unsigned query_id, int K, 
     }
 }
 
-
 void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
     std::vector<std::vector<Neighbor>> retsets(num_threads);
@@ -394,8 +464,8 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         while (k < (int)L)
         {
             int nk = L;
-            // if (finish_num >= num_threads / 2)
-            //     break;
+            if (finish_num >= num_threads / 2)
+                break;
             if (retsets[i][k].unexplored)
             {
                 retsets[i][k].unexplored = false;
@@ -404,7 +474,8 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 for (unsigned m = 0; m < graph[n].size(); ++m)
                 {
                     unsigned id = graph[n][m];
-                    if (m + 1 < graph[n].size()) {
+                    if (m + 1 < graph[n].size())
+                    {
                         _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
                     }
                     if (flags[id])
@@ -540,23 +611,23 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                 ++k;
         }
         finish_num++;
-        if (good_thread[i])
-        {
-            good_thread_finish_num++;
-        }
-        if (good_thread_finish_num == good_thread_num)
-            best_thread_finish = true;
-        // if (i == best_thread_id)
+        // if (good_thread[i])
+        // {
+        //     good_thread_finish_num++;
+        // }
+        // if (good_thread_finish_num == good_thread_num)
         //     best_thread_finish = true;
-        // else
-        // {
-        // if (best_thread_finish == false)
-        // {
-        //     std::vector<Neighbor> new_retset;
-        //     SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, best_dist, flags, new_retset);
-        //     new_retsets[i] = new_retset;
-        // }
-        // }
+        if (i == best_thread_id)
+            best_thread_finish = true;
+        else
+        {
+            if (best_thread_finish == false)
+            {
+                std::vector<Neighbor> new_retset;
+                SearchUntilBestThreadStop(query, query_id, K, L, best_thread_finish, best_dist, flags, new_retset);
+                new_retsets[i] = new_retset;
+            }
+        }
     }
     for (int i = 1; i < num_threads; i++)
     {

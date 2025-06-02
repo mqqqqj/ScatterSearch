@@ -34,6 +34,7 @@ public:
     void Search(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void SearchArraySimulation(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void SearchArraySimulationForPipeline(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &indices);
+    void SearchArraySimulationForPipelineWithET(const float *query, unsigned query_id, int thread_id, int K, int L, boost::dynamic_bitset<> &flags, std::atomic<bool> &stop, std::atomic<float> &best_dist, std::atomic<int> &best_thread_id, std::vector<Neighbor> &indices);
     void MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
