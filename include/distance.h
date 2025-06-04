@@ -10,4 +10,5 @@ float distance_ip(const float *a, const float *b, size_t size);
 float distance_ip_avx(const float *a, const float *b, size_t size);
 float distance_ip_sse(const float *a, const float *b, size_t size);
 float distance_ip_avx_simple(const float *a, const float *b, size_t size);
+float distance_ip_sse_simple(const float *a, const float *b, size_t size);
 #endif

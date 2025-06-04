@@ -33,7 +33,8 @@ ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
         // distance_func = distance_ip_avx_simple;
         std::cout << "Dist function: IP AVX" << std::endl;
 #elif defined SSE
-        distance_func = distance_ip_sse;
+        // distance_func = distance_ip_sse;
+        distance_func = distance_ip_sse_simple;
         std::cout << "Dist function: IP SSE" << std::endl;
 #else
         distance_func = distance_ip;
