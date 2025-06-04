@@ -53,15 +53,12 @@ int main(int argc, char **argv)
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
         latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
         res[i] = tmp;
-        if (i % 1000 == 999)
-        {
-            std::cout << "query " << i << " done" << std::endl;
-        }
     }
     // 计算平均latency
     float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
     float avg_latency = accumulate_latency / latency_list.size();
-    std::cout << "avg_latency: " << avg_latency << " ms" << std::endl;
+    std::cout <<"latency,recall,p95recall,p99recall"<<std::endl;
+    std::cout << avg_latency << ",";
     std::vector<float> recalls(query_num);
     for (unsigned i = 0; i < query_num; i++)
     {
@@ -81,11 +78,11 @@ int main(int argc, char **argv)
     }
     float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
     float avg_recall = accumulate_recall / recalls.size();
-    std::cout << "avg_recall: " << avg_recall << std::endl;
+    std::cout <<avg_recall << ",";
     std::sort(recalls.begin(), recalls.end());
     float p95_recall = recalls[recalls.size() * 0.05];
-    std::cout << "p95_recall: " << p95_recall << std::endl;
+    std::cout << p95_recall << ",";
     float p99_recall = recalls[recalls.size() * 0.01];
-    std::cout << "p99_recall: " << p99_recall << std::endl;
+    std::cout << p99_recall << std::endl;
     return 0;
 }

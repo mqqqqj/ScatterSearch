@@ -3,18 +3,43 @@
 #include <cstdlib>
 #include <sys/time.h>
 #include <omp.h>
+#include <xmmintrin.h> // 添加 SSE 头文件，包含 _mm_prefetch 和 _MM_HINT_T0
 
 #define BREAKDOWN_PRINT
-
+#define AVX
+// #define SSE
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
     dimension = dim;
     base_num = num;
     base_data = base;
     if (m == L2)
+    {
+#ifdef AVX
+        distance_func = distance_l2sqr_avx;
+        std::cout << "Dist function: L2SQR AVX" << std::endl;
+#elif defined SSE
+        distance_func = distance_l2sqr_sse;
+        std::cout << "Dist function: L2SQR SSE" << std::endl;
+#else
         distance_func = distance_l2sqr;
+        std::cout << "Dist function: L2SQR naive" << std::endl;
+#endif
+    }
     else if (m == INNER_PRODUCT)
+    {
+#ifdef AVX
+        distance_func = distance_ip_avx;
+        // distance_func = distance_ip_avx_simple;
+        std::cout << "Dist function: IP AVX" << std::endl;
+#elif defined SSE
+        distance_func = distance_ip_sse;
+        std::cout << "Dist function: IP SSE" << std::endl;
+#else
         distance_func = distance_ip;
+        std::cout << "Dist function: IP naive" << std::endl;
+#endif
+    }
     else
     {
         std::cerr << "Error: Unknown metric type" << std::endl;
@@ -461,11 +486,12 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         }
         std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
         int k = 0;
-        while (k < (int)L)
+        int hop = 0;
+        while (k < (int)L) // && hop < L
         {
             int nk = L;
-            if (finish_num >= num_threads / 2)
-                break;
+            // if (finish_num >= num_threads / 2)
+            //     break;
             if (retsets[i][k].unexplored)
             {
                 retsets[i][k].unexplored = false;
@@ -491,6 +517,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                     if (r < nk)
                         nk = r;
                 }
+                hop++;
             }
             if (nk <= k)
                 k = nk;
