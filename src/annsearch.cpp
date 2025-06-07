@@ -3,11 +3,9 @@
 #include <cstdlib>
 #include <sys/time.h>
 #include <omp.h>
-#include <xmmintrin.h> // 添加 SSE 头文件，包含 _mm_prefetch 和 _MM_HINT_T0
+#include <xmmintrin.h>
 
-#define BREAKDOWN_PRINT
-#define AVX
-// #define SSE
+
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
     dimension = dim;
@@ -33,8 +31,8 @@ ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
         // distance_func = distance_ip_avx_simple;
         std::cout << "Dist function: IP AVX" << std::endl;
 #elif defined SSE
-        // distance_func = distance_ip_sse;
-        distance_func = distance_ip_sse_simple;
+        distance_func = distance_ip_sse;
+        // distance_func = distance_ip_sse_simple;
         std::cout << "Dist function: IP SSE" << std::endl;
 #else
         distance_func = distance_ip;

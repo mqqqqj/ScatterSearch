@@ -60,6 +60,7 @@ int main(int argc, char **argv)
     std::atomic<float> best_dist[query_num];
     std::atomic<int> best_thread_id[query_num];
     std::atomic<bool> best_thread_finish[query_num];
+    std::vector<int> best_thread_finish_order(query_num);
     for (unsigned i = 0; i < query_num; i++)
     {
         finish_num[i] = 0;
@@ -88,7 +89,11 @@ int main(int argc, char **argv)
                     // if(finish_num[i] >= num_threads / 2)
                     //     best_thread_finish[i] = true;
                     if(best_thread_id[i] == j)
+                    {
                         best_thread_finish[i] = true;
+                        best_thread_finish_order[i] = finish_num[i];
+                        // std::cout << finish_num[i] << std::endl;
+                    }
                     if(finish_num[i] == num_threads)
                     {
                         flags[flag_idx].reset();
@@ -159,5 +164,8 @@ int main(int argc, char **argv)
     std::cout << "p95_recall: " << p95_recall << std::endl;
     float p99_recall = recalls[recalls.size() * 0.01];
     std::cout << "p99_recall: " << p99_recall << std::endl;
+    float avg_order = std::accumulate(best_thread_finish_order.begin(), best_thread_finish_order.end(), 0.0f) / best_thread_finish_order.size();
+    std::cout << avg_order << std::endl;
+
     return 0;
 }

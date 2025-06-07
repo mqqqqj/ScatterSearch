@@ -10,6 +10,9 @@
 #include <distance.h>
 #include <util.h>
 
+#define AVX
+// #define SSE
+
 enum Metric
 {
     L2,
