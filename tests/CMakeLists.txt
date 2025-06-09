@@ -12,3 +12,6 @@ target_link_libraries(pipeline_search ${PROJECT_NAME} -fopenmp)
 
 add_executable(pipeline_et_search pipeline_et_search.cpp)
 target_link_libraries(pipeline_et_search ${PROJECT_NAME} -fopenmp)
+
+add_executable(single_query single_query.cpp)
+target_link_libraries(single_query ${PROJECT_NAME} -fopenmp)

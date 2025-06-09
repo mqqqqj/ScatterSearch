@@ -5,7 +5,6 @@
 #include <omp.h>
 #include <xmmintrin.h>
 
-
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
     dimension = dim;
@@ -469,6 +468,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         int i = omp_get_thread_num();
         int ep = rand() % base_num;
         std::vector<unsigned> init_ids(L);
+        // std::vector<unsigned> visited_ids;
         unsigned tmp_l = 0;
         for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
         {
@@ -482,6 +482,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
             float dist = distance_func(base_data + dimension * id, query, dimension);
             retsets[i][j] = Neighbor(id, dist, true);
+            // visited_ids.push_back(id);
         }
         std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
         int k = 0;
@@ -511,6 +512,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                         continue;
                     Neighbor nn(id, dist, true);
                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
+                    // visited_ids.push_back(id);
                     if (tmp_l < L)
                         tmp_l++;
                     if (r < nk)
@@ -524,6 +526,17 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 ++k;
         }
         finish_num++;
+        // 在这里把这个线程的visit_ids写到txt文件里，txt的命名规则是：/home/mqj/proj/demos/t-sne/thread_{此线程id}_visited_ids.txt
+        // std::string filename = "/home/mqj/proj/demos/t-sne/thread_" + std::to_string(i) + "_visited_ids.txt";
+        // std::ofstream outfile(filename);
+        // if (outfile.is_open())
+        // {
+        //     for (const auto &id : visited_ids)
+        //     {
+        //         outfile << id << std::endl;
+        //     }
+        //     outfile.close();
+        // }
     }
     for (int i = 1; i < num_threads; i++)
     {
@@ -583,7 +596,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 10)
+            if (hop == 100)
             {
                 decide_num++;
                 if (best_dist > retsets[i][0].distance)
