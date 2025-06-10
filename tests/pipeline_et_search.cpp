@@ -126,10 +126,19 @@ int main(int argc, char **argv)
     std::cout << "Throughput(QPS): " << query_num / diff.count() << std::endl;
     std::cout << "Query time(s): " << diff.count() << std::endl;
     // 计算每个查询的延迟
+    std::vector<float> start_time_diffs(query_num); // 记录每个查询的最早和最晚开始时间差
     for (unsigned i = 0; i < query_num; i++)
     {
         auto earliest_start = *std::min_element(query_start_times[i].begin(), query_start_times[i].end());
+        auto latest_start = *std::max_element(query_start_times[i].begin(), query_start_times[i].end());
         auto latest_end = *std::max_element(query_end_times[i].begin(), query_end_times[i].end());
+
+        // 计算最早和最晚开始的时间差（毫秒）
+        start_time_diffs[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                                  latest_start - earliest_start)
+                                  .count() /
+                              1000.0f;
+
         latency_list[i] = std::chrono::duration_cast<std::chrono::microseconds>(
                               latest_end - earliest_start)
                               .count() /
@@ -139,6 +148,14 @@ int main(int argc, char **argv)
     float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
     float avg_latency = accumulate_latency / latency_list.size();
     std::cout << "avg_latency: " << avg_latency << " ms" << std::endl;
+    // 计算并输出开始时间差的统计信息
+    float avg_start_diff = std::accumulate(start_time_diffs.begin(), start_time_diffs.end(), 0.0f) / start_time_diffs.size();
+    std::cout << "平均开始时间差: " << avg_start_diff << " ms" << std::endl;
+    std::sort(start_time_diffs.begin(), start_time_diffs.end());
+    float p95_start_diff = start_time_diffs[start_time_diffs.size() * 0.95];
+    float p99_start_diff = start_time_diffs[start_time_diffs.size() * 0.99];
+    std::cout << "P95开始时间差: " << p95_start_diff << " ms" << std::endl;
+    std::cout << "P99开始时间差: " << p99_start_diff << " ms" << std::endl;
     std::vector<float> recalls(query_num);
     for (unsigned i = 0; i < query_num; i++)
     {

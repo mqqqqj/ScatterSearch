@@ -13,10 +13,10 @@ int main(int argc, char **argv)
     limit.rlim_max = 0;
     setrlimit(RLIMIT_CORE, &limit);
     srand(time(0));
-    if (argc != 8)
+    if (argc != 9)
     {
         std::cout << argv[0]
-                  << " data_file query_file nsg_path search_L search_K num_threads gt_path"
+                  << " data_file query_file nsg_path search_L search_K num_threads query_id gt_path"
                   << std::endl;
         exit(-1);
     }
@@ -30,9 +30,10 @@ int main(int argc, char **argv)
     int L = atoi(argv[4]);
     int K = atoi(argv[5]);
     int num_threads = atoi(argv[6]);
+    int query_id = atoi(argv[7]);
     std::vector<std::vector<unsigned>> groundtruth;
-    load_groundtruth(argv[7], groundtruth);
-    int query_id = 0;
+    load_groundtruth(argv[8], groundtruth);
+
     std::cout << "Groundtruth loaded" << std::endl;
     if (L < K)
     {
@@ -41,9 +42,10 @@ int main(int argc, char **argv)
     }
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
-    engine.LoadGroundtruth(argv[7]);
+    engine.LoadGroundtruth(argv[8]);
     boost::dynamic_bitset<> flags{points_num, 0};
     std::vector<unsigned> tmp(K);
+
     engine.MultiThreadSearchArraySimulation(query_load + (size_t)query_id * dim, query_id, K, L, num_threads, flags, tmp);
     // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
     return 0;

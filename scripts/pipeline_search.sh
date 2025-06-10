@@ -8,4 +8,4 @@ cd build && make -j && cd ..
 taskset -c 0-7 ./build/tests/pipeline_search /SSD/MainSearch/base.fbin \
 /SSD/MainSearch/query_test_unique.fbin \
 /SSD/models/nsg/mainsearch.L2000.R64.C2000.nsg \
-500 100 8 /SSD/MainSearch/gt.test_unique.bin
+600 100 8 /SSD/MainSearch/gt.test_unique.bin
