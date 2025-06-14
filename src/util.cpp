@@ -92,7 +92,7 @@ void load_groundtruth(char *filename, std::vector<std::vector<unsigned>> &ground
     in.close();
 }
 
-void save_results(const std::vector<TestResult> &results, char *filename)
+void save_results(const std::vector<TestResult> &results, std::string filename)
 {
     std::ofstream file(filename);
     file << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;

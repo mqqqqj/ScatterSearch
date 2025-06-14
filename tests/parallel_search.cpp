@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <chrono>
 #include <numeric>
+#include <sstream>
 
 int main(int argc, char **argv)
 {
@@ -16,8 +17,9 @@ int main(int argc, char **argv)
     if (argc != 8)
     {
         std::cout << argv[0]
-                  << " data_file query_file nsg_path search_L search_K num_threads gt_path"
+                  << " data_file query_file nsg_path search_L_list search_K num_threads gt_path"
                   << std::endl;
+        std::cout << "search_L_list format: L1,L2,L3,... (comma separated values)" << std::endl;
         exit(-1);
     }
     float *data_load = nullptr;
@@ -27,7 +29,17 @@ int main(int argc, char **argv)
     unsigned query_num, query_dim;
     load_fbin(argv[2], query_load, query_num, query_dim);
     assert(dim == query_dim);
-    int L = atoi(argv[4]);
+
+    // 解析L_list
+    std::vector<int> L_list;
+    std::string L_str = argv[4];
+    std::stringstream ss(L_str);
+    std::string L_val;
+    while (std::getline(ss, L_val, ','))
+    {
+        L_list.push_back(std::stoi(L_val));
+    }
+
     int K = atoi(argv[5]);
     int num_threads = atoi(argv[6]);
     std::vector<std::vector<unsigned>> groundtruth;
@@ -36,67 +48,75 @@ int main(int argc, char **argv)
         query_num = 10000;
     // query_num = 100;
     std::cout << "Groundtruth loaded" << std::endl;
-    if (L < K)
+
+    // 检查所有L值是否合法
+    for (int L : L_list)
     {
-        std::cout << "search_L cannot be smaller than search_K!" << std::endl;
-        exit(-1);
+        if (L < K)
+        {
+            std::cout << "search_L cannot be smaller than search_K!" << std::endl;
+            exit(-1);
+        }
     }
+
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-    boost::dynamic_bitset<> flags{points_num, 0};
-    std::vector<std::vector<unsigned>> res(query_num);
-    std::vector<float> latency_list(query_num); // 单位：毫秒
-    auto s = std::chrono::high_resolution_clock::now();
-    for (unsigned i = 0; i < query_num; i++)
+
+    std::vector<TestResult> test_results;
+    // 对每个L值进行搜索
+    for (int L : L_list)
     {
-        std::vector<unsigned> tmp(K);
-        auto start_time = std::chrono::high_resolution_clock::now();
-        // engine.MultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-        flags.reset();
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-        latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
-        res[i] = tmp;
-        if (i % 1000 == 999)
+        boost::dynamic_bitset<> flags{points_num, 0};
+        std::vector<std::vector<unsigned>> res(query_num);
+        std::vector<float> latency_list(query_num); // 单位：毫秒
+        auto s = std::chrono::high_resolution_clock::now();
+        for (unsigned i = 0; i < query_num; i++)
         {
-            std::cout << "query " << i << " done" << std::endl;
-        }
-    }
-    auto e = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff = e - s;
-    std::cout << "Throughput(QPS): " << query_num / diff.count() << std::endl;
-    std::cout << "Query time(s): " << diff.count() << std::endl;
-    // 计算平均latency
-    float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
-    float avg_latency = accumulate_latency / latency_list.size();
-    std::cout << "avg_latency: " << avg_latency << " ms" << std::endl;
-    std::vector<float> recalls(query_num);
-    for (unsigned i = 0; i < query_num; i++)
-    {
-        int correct = 0;
-        for (unsigned j = 0; j < K; j++)
-        {
-            for (unsigned g = 0; g < K; g++)
+            std::vector<unsigned> tmp(K);
+            auto start_time = std::chrono::high_resolution_clock::now();
+            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            flags.reset();
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
+            res[i] = tmp;
+            if (i % 1000 == 999)
             {
-                if (res[i][j] == groundtruth[i][g])
-                {
-                    correct++;
-                    break;
-                }
+                std::cout << "query " << i << " done" << std::endl;
             }
         }
-        recalls[i] = (float)correct / K;
+        auto e = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> diff = e - s;
+        float qps = query_num / diff.count();
+        float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
+        float avg_latency = accumulate_latency / latency_list.size();
+        std::vector<float> recalls(query_num);
+        for (unsigned i = 0; i < query_num; i++)
+        {
+            int correct = 0;
+            for (unsigned j = 0; j < K; j++)
+            {
+                for (unsigned g = 0; g < K; g++)
+                {
+                    if (res[i][j] == groundtruth[i][g])
+                    {
+                        correct++;
+                        break;
+                    }
+                }
+            }
+            recalls[i] = (float)correct / K;
+        }
+        float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
+        float avg_recall = accumulate_recall / recalls.size();
+        std::sort(recalls.begin(), recalls.end());
+        TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01]};
+        test_results.push_back(tr);
+        std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
+        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
     }
-    float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
-    float avg_recall = accumulate_recall / recalls.size();
-    std::cout << "avg_recall: " << avg_recall << std::endl;
-    std::sort(recalls.begin(), recalls.end());
-    float p95_recall = recalls[recalls.size() * 0.05];
-    std::cout << "p95_recall: " << p95_recall << std::endl;
-    float p99_recall = recalls[recalls.size() * 0.01];
-    std::cout << "p99_recall: " << p99_recall << std::endl;
+    std::string save_path = "./parallel_results/openmp_" + std::to_string(num_threads) + "t_defaultep.csv";
+    save_results(test_results, save_path);
     return 0;
 }

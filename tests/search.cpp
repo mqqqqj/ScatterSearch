@@ -110,6 +110,7 @@ int main(int argc, char **argv)
         std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
     }
-    save_results(test_results, "./simd_results/avx.csv");
+    std::string save_path = "./simd_results/avx.csv";
+    save_results(test_results, save_path);
     return 0;
 }

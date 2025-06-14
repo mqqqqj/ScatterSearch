@@ -7,6 +7,9 @@ target_link_libraries(search ${PROJECT_NAME} -fopenmp)
 add_executable(parallel_search parallel_search.cpp)
 target_link_libraries(parallel_search ${PROJECT_NAME} -fopenmp)
 
+add_executable(pthread_search pthread_search.cpp)
+target_link_libraries(pthread_search ${PROJECT_NAME} -pthread)
+
 add_executable(pipeline_search pipeline_search.cpp)
 target_link_libraries(pipeline_search ${PROJECT_NAME} -fopenmp)
 

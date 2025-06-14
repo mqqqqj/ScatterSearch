@@ -75,6 +75,8 @@ int main(int argc, char **argv)
     {
         flags[i] = boost::dynamic_bitset<>(points_num, 0);
     }
+    std::vector<std::vector<std::vector<Neighbor>>> retsets(flag_pool_size, std::vector<std::vector<Neighbor>>(num_threads, std::vector<Neighbor>(L + 1)));
+    std::vector<std::vector<bool>> is_reach_20_hop(flag_pool_size, std::vector<bool>(num_threads));
     for (unsigned i = 0; i < query_num; i++)
     {
         float *query_ptr = query_load + (size_t)i * dim;
@@ -84,7 +86,7 @@ int main(int argc, char **argv)
                                            {
                     query_start_times[i][j] = std::chrono::high_resolution_clock::now();
                     int flag_idx = i % flag_pool_size;
-                    engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], best_dist[i], best_thread_id[i], res[i][j]);
+                    engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], retsets[flag_idx], is_reach_20_hop[flag_idx], best_dist[i], best_thread_id[i], res[i][j]);
                     finish_num[i] ++;
                     // if(finish_num[i] >= num_threads / 2)
                     //     best_thread_finish[i] = true;
@@ -97,6 +99,12 @@ int main(int argc, char **argv)
                     if(finish_num[i] == num_threads)
                     {
                         flags[flag_idx].reset();
+                        // 把retsets[flag_idx]中的元素清空
+                        for(int t = 0; t < num_threads; t++) {
+                            retsets[flag_idx][t].clear();
+                            retsets[flag_idx][t].resize(L + 1);
+                            is_reach_20_hop[flag_idx][num_threads] = false;
+                        }
                         // merge result
                         int master = -1;
                         for(unsigned t = 0; t < num_threads; t++)

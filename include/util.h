@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <cstring>
+#include <string>
 
 #define LOG
 
@@ -13,8 +14,8 @@ struct TestResult
     float throughput;
     float latency;
     float recall;
-    float p99_recall;
     float p95_recall;
+    float p99_recall;
 };
 
 struct Neighbor
@@ -33,7 +34,7 @@ struct Neighbor
 void load_fvecs(char *filename, float *&data, unsigned &num, unsigned &dim);
 void load_fbin(char *filename, float *&data, unsigned &num, unsigned &dim);
 void load_groundtruth(char *filename, std::vector<std::vector<unsigned>> &groundtruth);
-void save_results(const std::vector<TestResult> &results, char *filename);
+void save_results(const std::vector<TestResult> &results, std::string filename);
 
 inline int InsertIntoPool(Neighbor *addr, unsigned K, Neighbor nn)
 {
