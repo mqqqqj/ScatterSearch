@@ -18,3 +18,6 @@ target_link_libraries(pipeline_et_search ${PROJECT_NAME} -fopenmp)
 
 add_executable(single_query single_query.cpp)
 target_link_libraries(single_query ${PROJECT_NAME} -fopenmp)
+
+add_executable(tree_termination tree_termination.cpp)
+target_link_libraries(tree_termination ${PROJECT_NAME} -pthread)
