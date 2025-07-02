@@ -708,12 +708,12 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     bool is_reach_100hop[num_threads];
     memset(is_reach_100hop, 0, sizeof(bool) * num_threads);
     std::vector<unsigned> ep_list;
-    // select_entry_points(30, num_threads, query, ep_list);
+    select_entry_points(30, num_threads, query, ep_list);
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
-        int ep = rand() % base_num;
-        // int ep = ep_list[i];
+        // int ep = rand() % base_num;
+        int ep = ep_list[i];
         int hop = 0;
         std::vector<unsigned> init_ids(L);
         bool need_identify = true;
@@ -795,7 +795,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             best_thread_finish = true;
             if (decide_num < num_threads)
             {
-                std::cout << "1" << std::endl;
+                // std::cout << "1" << std::endl;
             }
         }
         else
