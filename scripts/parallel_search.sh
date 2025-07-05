@@ -1,15 +1,15 @@
 cd build && make -j && cd ..
 
 # L_list=(100 150 200 250 300 350 400 450 500)
-L_list=(100 150 200 250 300 400 500)
-# L_list=(400)
+# L_list=(100 150 200 250 300 400 500)
+L_list=(500)
 
 L_str=$(IFS=,; echo "${L_list[*]}")
 
-# taskset -c 0-7 ./build/tests/parallel_search /SSD/MainSearch/base.fbin \
-# /SSD/MainSearch/query_test_unique.fbin \
-# /SSD/models/nsg/mainsearch.L2000.R64.C2000.nsg \
-# "$L_str" 100 8 /SSD/MainSearch/gt.test_unique.bin "mainsearch"
+taskset -c 0-7 ./build/tests/parallel_search /SSD/MainSearch/base.fbin \
+/SSD/MainSearch/query_test_unique.fbin \
+/SSD/models/nsg/mainsearch.L2000.R64.C2000.nsg \
+"$L_str" 100 8 /SSD/MainSearch/gt.test_unique.bin "tmp_mainsearch"
 
 # taskset -c 0-7 ./build/tests/parallel_search /SSD/MainSearch/base_100k.fbin \
 # /SSD/MainSearch/test_5k.fbin \
@@ -31,7 +31,7 @@ L_str=$(IFS=,; echo "${L_list[*]}")
 # /SSD/models/nsg/deep10m.L2000.R64.C2000.nsg \
 # "$L_str" 100 8 /SSD/DEEP10M/gt.query.top100.bin "deep"
 
-taskset -c 0-7 ./build/tests/parallel_search /SSD/WebVid/webvid.base.2.5M.fbin \
-/SSD/WebVid/webvid.query.10k.fbin \
-/SSD/models/nsg/webvid.L2000.R64.C2000.nsg \
-"$L_str" 100 8 /SSD/WebVid/gt.query.top100.bin "webvid"
+# taskset -c 0-7 ./build/tests/parallel_search /SSD/WebVid/webvid.base.2.5M.fbin \
+# /SSD/WebVid/webvid.query.10k.fbin \
+# /SSD/models/nsg/webvid.L2000.R64.C2000.nsg \
+# "$L_str" 100 8 /SSD/WebVid/gt.query.top100.bin "webvid"

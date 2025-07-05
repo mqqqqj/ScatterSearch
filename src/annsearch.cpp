@@ -48,9 +48,6 @@ ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 
 ANNSearch::~ANNSearch()
 {
-    // 如果base_data是动态分配的，需要在这里释放
-    // 如果base_data是外部传入的，则不需要释放
-    // delete[] base_data;  // 根据实际情况决定是否需要释放
 }
 
 void ANNSearch::LoadGraph(const char *filename)
@@ -261,7 +258,8 @@ void ANNSearch::Search(const float *query, unsigned query_id, int K, int L, boos
 
 void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int K, int L, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
-    int ep = rand() % base_num;
+    // int ep = rand() % base_num;
+    int ep = default_ep;
     std::vector<unsigned> init_ids(L);
     unsigned tmp_l = 0;
     for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
@@ -422,7 +420,7 @@ void ANNSearch::SearchArraySimulationForPipelineWithET(const float *query, unsig
                 best_thread_id = thread_id;
             }
         }
-        if (hop > 100 && best_dist < 1.5 * retset[0].distance)
+        if (hop > 100 && best_dist < 1.4 * retset[0].distance)
             break;
         int nk = L;
         if (retset[k].unexplored)
@@ -583,24 +581,24 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     {
         std::vector<unsigned> visited_ids;
         int i = omp_get_thread_num();
-        int ep = rand() % base_num;
+        // int ep = rand() % base_num;
         // int ep = ep_list[i];
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
-        for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
-        {
-            init_ids[tmp_l] = graph[ep][tmp_l];
-            flags[init_ids[tmp_l]] = true;
-        }
-        // for (int j = 0; j < graph[default_ep].size(); j++)
+        // for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
         // {
-        //     if (j % num_threads == i)
-        //     {
-        //         init_ids[tmp_l] = graph[default_ep][j];
-        //         flags[init_ids[tmp_l]] = true;
-        //         tmp_l++;
-        //     }
+        //     init_ids[tmp_l] = graph[ep][tmp_l];
+        //     flags[init_ids[tmp_l]] = true;
         // }
+        for (int j = 0; j < graph[default_ep].size(); j++)
+        {
+            if (j % num_threads == i)
+            {
+                init_ids[tmp_l] = graph[default_ep][j];
+                flags[init_ids[tmp_l]] = true;
+                tmp_l++;
+            }
+        }
         retsets[i].resize(L + 1);
         for (unsigned j = 0; j < tmp_l; j++)
         {
@@ -614,7 +612,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         int k = 0;
         int hop = 0;
         bool check = true;
-        while (k < (int)L) //&& hop < L
+        while (k < (int)L && hop < L) //
         {
             int nk = L;
             // if (finish_num >= num_threads / 2)
@@ -708,12 +706,12 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     bool is_reach_100hop[num_threads];
     memset(is_reach_100hop, 0, sizeof(bool) * num_threads);
     std::vector<unsigned> ep_list;
-    select_entry_points(30, num_threads, query, ep_list);
+    // select_entry_points(30, num_threads, query, ep_list);
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
-        // int ep = rand() % base_num;
-        int ep = ep_list[i];
+        int ep = rand() % base_num;
+        // int ep = ep_list[i];
         int hop = 0;
         std::vector<unsigned> init_ids(L);
         bool need_identify = true;
