@@ -710,21 +710,29 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
-        int ep = rand() % base_num;
         // int ep = ep_list[i];
         int hop = 0;
         std::vector<unsigned> init_ids(L);
         bool need_identify = true;
         unsigned tmp_l = 0;
-        while (tmp_l < K)
-        {
-            int id = rand() % base_num;
-            if (flags[id])
-                continue;
-            init_ids[tmp_l] = id;
-            tmp_l++;
-        }
         retsets[i].resize(L + 1);
+        // while (tmp_l < K)
+        // {
+        //     int id = rand() % base_num;
+        //     if (flags[id])
+        //         continue;
+        //     init_ids[tmp_l] = id;
+        //     tmp_l++;
+        // }
+        for (int j = 0; j < graph[default_ep].size(); j++)
+        {
+            if (j % num_threads == i)
+            {
+                init_ids[tmp_l] = graph[default_ep][j];
+                flags[init_ids[tmp_l]] = true;
+                tmp_l++;
+            }
+        }
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
@@ -751,7 +759,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             if (need_identify && decide_num == num_threads)
             {
                 need_identify = false;
-                if (best_dist < 1.4 * retsets[i][9].distance)
+                if (best_dist < 1.3 * retsets[i][9].distance)
                 {
                     good_thread[i] = -1;
                     break;
