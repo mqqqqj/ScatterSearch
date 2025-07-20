@@ -7,6 +7,7 @@
 #include <cmath>
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
+    dist_comps = 0;
     dimension = dim;
     base_num = num;
     base_data = base;
@@ -277,6 +278,8 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
     }
     std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
     int k = 0;
+    int hop = 0;
+    bool record_first_nn = true;
     while (k < (int)L)
     {
         int nk = L;
@@ -288,6 +291,14 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
             for (unsigned m = 0; m < graph[n].size(); ++m)
             {
                 unsigned id = graph[n][m];
+                // if (record_first_nn)
+                //     for (int knn = 0; knn < K; knn++)
+                //         if (id == groundtruth[query_id][knn])
+                //         {
+                //             std::cout << "Find " << knn + 1 << "th NN at hop " << hop << std::endl;
+                //             record_first_nn = false;
+                //             break;
+                //         }
                 if (m + 1 < graph[n].size())
                 {
                     _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
@@ -305,6 +316,7 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
                 if (r < nk)
                     nk = r;
             }
+            hop++;
         }
         if (nk <= k)
             k = nk;
@@ -605,6 +617,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             unsigned id = init_ids[j];
             _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
             float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef RECORD_DIST_COMPS
+            dist_comps++;
+#endif
             retsets[i][j] = Neighbor(id, dist, true);
             // visited_ids.push_back(id);
         }
@@ -612,7 +627,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         int k = 0;
         int hop = 0;
         bool check = true;
-        while (k < (int)L && hop < L) //
+        while (k < (int)L) // && hop < L
         {
             int nk = L;
             // if (finish_num >= num_threads / 2)
@@ -625,6 +640,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 for (unsigned m = 0; m < graph[n].size(); ++m)
                 {
                     unsigned id = graph[n][m];
+                    // for (int knn = 0; knn < K; knn++)
+                    //     if (id == groundtruth[query_id][knn])
+                    //         std::cout << "Find kNN at hop " << hop << std::endl;
                     if (m + 1 < graph[n].size())
                     {
                         _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
@@ -633,6 +651,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                         continue;
                     flags[id] = true;
                     float dist = distance_func(query, base_data + dimension * id, dimension);
+#ifdef RECORD_DIST_COMPS
+                    dist_comps++;
+#endif
                     if (dist >= retsets[i][tmp_l - 1].distance)
                         continue;
                     Neighbor nn(id, dist, true);
@@ -681,7 +702,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     {
         for (size_t j = 0; j < K; j++)
         {
-            InsertIntoPool(retsets[0].data(), K, retsets[i][j]);
+            int pos = InsertIntoPool(retsets[0].data(), K, retsets[i][j]);
+            if (pos == K)
+                break;
         }
     }
     for (size_t i = 0; i < K; i++)
@@ -737,6 +760,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         {
             unsigned id = init_ids[j];
             float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef RECORD_DIST_COMPS
+            dist_comps++;
+#endif
             retsets[i][j] = Neighbor(id, dist, true);
         }
         std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
@@ -780,6 +806,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                         continue;
                     flags[id] = true;
                     float dist = distance_func(query, base_data + dimension * id, dimension);
+#ifdef RECORD_DIST_COMPS
+                    dist_comps++;
+#endif
                     if (dist >= retsets[i][tmp_l - 1].distance)
                         continue;
                     Neighbor nn(id, dist, true);
@@ -806,32 +835,37 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         }
         else
         {
-            // if (best_thread_finish == false)
-            // {
-            //     std::vector<Neighbor> new_retset;
-            //     SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, new_retset);
-            //     new_retsets[i] = new_retset;
-            // }
+            if (best_thread_finish == false)
+            {
+                std::vector<Neighbor> new_retset;
+                SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, new_retset);
+                new_retsets[i] = new_retset;
+            }
         }
     }
-    for (int i = 1; i < num_threads; i++)
+    for (int i = 0; i < num_threads; i++)
     {
-        for (size_t j = 0; j < K; j++)
-        {
-            InsertIntoPool(retsets[0].data(), K, retsets[i][j]);
-        }
+        if (i != best_thread_id)
+            for (size_t j = 0; j < K; j++)
+            {
+                int pos = InsertIntoPool(retsets[best_thread_id].data(), K, retsets[i][j]);
+                if (pos == K)
+                    break;
+            }
     }
     for (size_t i = 0; i < new_retsets.size(); i++)
     {
         if (new_retsets[i].size())
             for (int j = 0; j < K; j++)
             {
-                InsertIntoPool(retsets[0].data(), K, new_retsets[i][j]);
+                int pos = InsertIntoPool(retsets[best_thread_id].data(), K, new_retsets[i][j]);
+                if (pos == K)
+                    break;
             }
     }
     for (size_t i = 0; i < K; i++)
     {
-        indices[i] = retsets[0][i].id;
+        indices[i] = retsets[best_thread_id][i].id;
     }
 }
 
@@ -1030,6 +1064,9 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
                 continue;
             flags[id] = true;
             float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef RECORD_DIST_COMPS
+            dist_comps++;
+#endif
             retsets[current_turn][tmp_l] = Neighbor(id, dist, true);
         }
         std::sort(retsets[current_turn].begin(), retsets[current_turn].begin() + tmp_l);
@@ -1055,6 +1092,9 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
                         continue;
                     flags[id] = true;
                     float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef RECORD_DIST_COMPS
+                    dist_comps++;
+#endif
                     if (dist >= retsets[current_turn][tmp_l - 1].distance)
                         continue;
                     Neighbor nn(id, dist, true);

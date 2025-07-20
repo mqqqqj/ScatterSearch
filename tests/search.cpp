@@ -62,6 +62,7 @@ int main(int argc, char **argv)
 
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
+    engine.LoadGroundtruth(argv[6]);
     std::vector<TestResult> test_results;
     // 对每个L值进行搜索
     for (int L : L_list)

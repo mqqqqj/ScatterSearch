@@ -13,6 +13,8 @@
 #define AVX
 // #define SSE
 
+#define RECORD_DIST_COMPS
+
 enum Metric
 {
     L2,
@@ -44,6 +46,9 @@ public:
     void MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulationWithETTopM(const float *query, unsigned query_id, int K, int L, int num_threads, float percentage, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::vector<std::vector<Neighbor>> &retsets, int *good_thread, bool *is_reach_100hop, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors);
+
+public:
+    std::atomic<int> dist_comps;
 
 private:
     double get_time_mark();

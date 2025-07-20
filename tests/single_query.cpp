@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <chrono>
 #include <numeric>
+#include <unordered_set>
 
 int main(int argc, char **argv)
 {
@@ -47,6 +48,18 @@ int main(int argc, char **argv)
     std::vector<unsigned> tmp(K);
 
     engine.MultiThreadSearchArraySimulation(query_load + (size_t)query_id * dim, query_id, K, L, num_threads, flags, tmp);
-    // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+    // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)query_id * dim, query_id, K, L, num_threads, flags, tmp);
+
+    // 基于tmp和groundtruth计算recall
+    std::unordered_set<unsigned> gt_set(groundtruth[query_id].begin(), groundtruth[query_id].end());
+    unsigned hit = 0;
+    for (unsigned id : tmp)
+    {
+        if (gt_set.count(id))
+            hit++;
+    }
+    float recall = static_cast<float>(hit) / K;
+    std::cout << "Recall: " << recall << std::endl;
+    std::cout << "Computations: " << engine.dist_comps << std::endl;
     return 0;
 }

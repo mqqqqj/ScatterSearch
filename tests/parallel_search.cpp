@@ -115,6 +115,7 @@ int main(int argc, char **argv)
         std::sort(recalls.begin(), recalls.end());
         TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01]};
         test_results.push_back(tr);
+        std::cout << "Distance computations:" << (float)engine.dist_comps / query_num << std::endl;
         std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
     }
