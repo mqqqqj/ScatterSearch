@@ -10,6 +10,9 @@ target_link_libraries(parallel_search ${PROJECT_NAME} -fopenmp)
 add_executable(pthread_search pthread_search.cpp)
 target_link_libraries(pthread_search ${PROJECT_NAME} -pthread)
 
+add_executable(pthread_sync_search pthread_sync_search.cpp)
+target_link_libraries(pthread_sync_search ${PROJECT_NAME} -pthread)
+
 add_executable(pipeline_search pipeline_search.cpp)
 target_link_libraries(pipeline_search ${PROJECT_NAME} -fopenmp)
 
@@ -24,6 +27,9 @@ target_link_libraries(online_parallel_search ${PROJECT_NAME} -fopenmp)
 
 add_executable(single_query single_query.cpp)
 target_link_libraries(single_query ${PROJECT_NAME} -fopenmp)
+
+add_executable(hop_find_first_knn hop_find_first_knn.cpp)
+target_link_libraries(hop_find_first_knn ${PROJECT_NAME} -fopenmp)
 
 add_executable(tree_termination tree_termination.cpp)
 target_link_libraries(tree_termination ${PROJECT_NAME} -pthread)

@@ -9,11 +9,15 @@
 #include <boost/dynamic_bitset.hpp>
 #include <distance.h>
 #include <util.h>
+#include <map>
 
 #define AVX
 // #define SSE
 
-#define RECORD_DIST_COMPS
+// #define RECORD_DIST_COMPS
+// #define COLLECT_VISITED_ID
+// #define COLLECT_SEARCH_TREE
+#define BREAKDOWN_ANALYSIS
 
 enum Metric
 {
@@ -49,12 +53,22 @@ public:
 
 public:
     std::atomic<int> dist_comps;
-
+    std::atomic<int> hop_count;
+    double time_expand_;
+    double time_merge_;
+#ifdef COLLECT_VISITED_ID
+    std::vector<std::vector<unsigned>> visited_lists;
+#endif
+    std::vector<int> hop_find_first_knn;
+    std::vector<int> hop_find_all_knn;
+#ifdef COLLECT_SEARCH_TREE
+    std::map<int, std::vector<std::pair<int, int>>> search_tree; // thread_id, arr:pair(current_node_id, father_node_id)
+#endif
 private:
     double get_time_mark();
     void select_entry_points(int pool_size, int P, const float *query, std::vector<unsigned> &selected_eps);
 
-private:
+public:
     unsigned default_ep;
     size_t dimension;
     size_t base_num;

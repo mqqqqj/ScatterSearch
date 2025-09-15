@@ -76,11 +76,12 @@ int main(int argc, char **argv)
         {
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             flags.reset();
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
             latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
             res[i] = tmp;
             if (i % 1000 == 999)
@@ -113,13 +114,16 @@ int main(int argc, char **argv)
         float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
         float avg_recall = accumulate_recall / recalls.size();
         std::sort(recalls.begin(), recalls.end());
-        TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01]};
+        TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01], (float)engine.dist_comps / query_num, (float)engine.hop_count / (query_num * num_threads)};
+        engine.dist_comps = 0;
+        engine.hop_count = 0;
         test_results.push_back(tr);
-        std::cout << "Distance computations:" << (float)engine.dist_comps / query_num << std::endl;
-        std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
-        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
+        std::cout << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops,t_expand(s.),t_merge(s.),t_p_expand(%),t_p_merge(%)" << std::endl;
+        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << tr.dist_comps << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << 1000 * engine.time_expand_ / accumulate_latency << "," << 1000 * engine.time_merge_ / accumulate_latency << std::endl;
+        engine.time_expand_ = 0;
+        engine.time_merge_ = 0;
     }
     std::string save_path = "./results/" + dataset_name + "_parallel_" + std::to_string(num_threads) + "t.csv";
-    save_results(test_results, save_path);
+    // save_results(test_results, save_path);
     return 0;
 }

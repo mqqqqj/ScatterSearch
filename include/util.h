@@ -16,6 +16,8 @@ struct TestResult
     float recall;
     float p95_recall;
     float p99_recall;
+    float dist_comps;
+    float hops;
 };
 
 struct Neighbor

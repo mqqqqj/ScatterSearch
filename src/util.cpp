@@ -94,13 +94,14 @@ void load_groundtruth(char *filename, std::vector<std::vector<unsigned>> &ground
 
 void save_results(const std::vector<TestResult> &results, std::string filename)
 {
-    std::ofstream file(filename);
-    file << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
+    std::ofstream file(filename, std::ios::app);
+    file << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops" << std::endl;
     for (unsigned i = 0; i < results.size(); i++)
     {
         file << results[i].L << "," << results[i].throughput << ","
              << results[i].latency << "," << results[i].recall << ","
-             << results[i].p99_recall << "," << results[i].p95_recall << std::endl;
+             << results[i].p95_recall << "," << results[i].p99_recall << ","
+             << results[i].dist_comps << "," << results[i].hops << std::endl;
     }
     file.close();
 }

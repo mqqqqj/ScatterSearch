@@ -5,9 +5,13 @@
 #include <omp.h>
 #include <xmmintrin.h>
 #include <cmath>
+
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
     dist_comps = 0;
+    hop_count = 0;
+    time_expand_ = 0;
+    time_merge_ = 0;
     dimension = dim;
     base_num = num;
     base_data = base;
@@ -279,9 +283,11 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
     std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
     int k = 0;
     int hop = 0;
-    bool record_first_nn = true;
+    int knn_cnt = 0;
     while (k < (int)L)
     {
+        if (knn_cnt == K * 0.9)
+            break;
         int nk = L;
         if (retset[k].unexplored)
         {
@@ -291,21 +297,27 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
             for (unsigned m = 0; m < graph[n].size(); ++m)
             {
                 unsigned id = graph[n][m];
-                // if (record_first_nn)
-                //     for (int knn = 0; knn < K; knn++)
-                //         if (id == groundtruth[query_id][knn])
-                //         {
-                //             std::cout << "Find " << knn + 1 << "th NN at hop " << hop << std::endl;
-                //             record_first_nn = false;
-                //             break;
-                //         }
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                for (int knn = 0; knn < K; knn++)
+                    if (id == groundtruth[query_id][knn])
+                    {
+                        knn_cnt += 1;
+                        if (knn_cnt == 1)
+                        {
+                            hop_find_first_knn.push_back(hop);
+                        }
+                        if (knn_cnt == K * 0.9)
+                        {
+                            hop_find_all_knn.push_back(hop);
+                        }
+                        break;
+                    }
                 if (m + 1 < graph[n].size())
                 {
                     _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
                 }
-                if (flags[id])
-                    continue;
-                flags[id] = true;
                 float dist = distance_func(query, base_data + dimension * id, dimension);
                 if (dist >= retset[tmp_l - 1].distance)
                     continue;
@@ -581,14 +593,16 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 {
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     int finish_num = 0;
-    float firstnn_distance = distance_func(base_data + dimension * groundtruth[query_id][0], query, dimension);
-    float knn_distance = distance_func(base_data + dimension * groundtruth[query_id][K - 1], query, dimension);
-    // std::cout << "first nn distance: " << firstnn_distance << ", knn distance: " << knn_distance << std::endl;
+// std::vector<unsigned> ep_list;
+// select_entry_points(30, num_threads, query, ep_list);
+// iqan ep
 
-    // std::vector<unsigned> ep_list;
-    // select_entry_points(30, num_threads, query, ep_list);
-    // iqan ep
-
+// 记录召回的knn数量
+// std::atomic<int> knn_cnt;
+// knn_cnt = 0;
+#ifdef BREAKDOWN_ANALYSIS
+    time_expand_ -= get_time_mark();
+#endif
 #pragma omp parallel num_threads(num_threads)
     {
         std::vector<unsigned> visited_ids;
@@ -617,6 +631,12 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             unsigned id = init_ids[j];
             _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
             float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef COLLECT_SEARCH_TREE
+            search_tree[i].push_back(std::make_pair(id, default_ep));
+#endif
+#ifdef COLLECT_VISITED_ID
+            visited_lists[i].push_back(id);
+#endif
 #ifdef RECORD_DIST_COMPS
             dist_comps++;
 #endif
@@ -642,7 +662,20 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                     unsigned id = graph[n][m];
                     // for (int knn = 0; knn < K; knn++)
                     //     if (id == groundtruth[query_id][knn])
-                    //         std::cout << "Find kNN at hop " << hop << std::endl;
+                    //     {
+                    //         knn_cnt += 1;
+                    //         if (knn_cnt == 1)
+                    //         {
+                    //             // hop_find_first_knn.push_back(hop);
+                    //             hop_find_first_knn.push_back(dist_comps);
+                    //         }
+                    //         if (knn_cnt == K)
+                    //         {
+                    //             // hop_find_all_knn.push_back(hop);
+                    //             hop_find_all_knn.push_back(dist_comps);
+                    //         }
+                    //         break;
+                    //     }
                     if (m + 1 < graph[n].size())
                     {
                         _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
@@ -651,6 +684,12 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                         continue;
                     flags[id] = true;
                     float dist = distance_func(query, base_data + dimension * id, dimension);
+#ifdef COLLECT_SEARCH_TREE
+                    search_tree[i].push_back(std::make_pair(id, n));
+#endif
+#ifdef COLLECT_VISITED_ID
+                    visited_lists[i].push_back(id);
+#endif
 #ifdef RECORD_DIST_COMPS
                     dist_comps++;
 #endif
@@ -677,6 +716,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 ++k;
         }
         finish_num++;
+        hop_count += hop;
         // 在这里把这个线程的visit_ids写到txt文件里，txt的命名规则是：/home/mqj/proj/demos/t-sne/thread_{此线程id}_visited_ids.txt
         // std::string filename = "/home/mqj/proj/demos/t-sne/thread_" + std::to_string(i) + "_visited_ids.txt";
         // std::ofstream outfile(filename);
@@ -689,15 +729,19 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         //     outfile.close();
         // }
     }
-    // for (int i = 0; i < num_threads; i++)
-    // {
-    //     for (int j = 0; j < L; j++)
-    //         if (retsets[i][j].distance > knn_distance)
-    //         {
-    //             std::cout << "thread " << i << "'s recall is " << j << ", and this thread's 1nn distance : " << retsets[i][0].distance << std::endl;
-    //             break;
-    //         }
-    // }
+// for (int i = 0; i < num_threads; i++)
+// {
+//     for (int j = 0; j < L; j++)
+//         if (retsets[i][j].distance > knn_distance)
+//         {
+//             std::cout << "thread " << i << "'s recall is " << j << ", and this thread's 1nn distance : " << retsets[i][0].distance << std::endl;
+//             break;
+//         }
+// }
+#ifdef BREAKDOWN_ANALYSIS
+    time_expand_ += get_time_mark();
+    time_merge_ -= get_time_mark();
+#endif
     for (int i = 1; i < num_threads; i++)
     {
         for (size_t j = 0; j < K; j++)
@@ -707,6 +751,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 break;
         }
     }
+#ifdef BREAKDOWN_ANALYSIS
+    time_merge_ += get_time_mark();
+#endif
     for (size_t i = 0; i < K; i++)
     {
         indices[i] = retsets[0][i].id;
@@ -728,8 +775,11 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     memset(good_thread, 0, sizeof(int) * num_threads);
     bool is_reach_100hop[num_threads];
     memset(is_reach_100hop, 0, sizeof(bool) * num_threads);
-    std::vector<unsigned> ep_list;
-    // select_entry_points(30, num_threads, query, ep_list);
+    // std::vector<unsigned> ep_list;
+// select_entry_points(30, num_threads, query, ep_list);
+#ifdef BREAKDOWN_ANALYSIS
+    time_expand_ -= get_time_mark();
+#endif
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
@@ -760,6 +810,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         {
             unsigned id = init_ids[j];
             float dist = distance_func(base_data + dimension * id, query, dimension);
+#ifdef COLLECT_SEARCH_TREE
+            search_tree[i].push_back(std::make_pair(id, default_ep));
+#endif
 #ifdef RECORD_DIST_COMPS
             dist_comps++;
 #endif
@@ -785,7 +838,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             if (need_identify && decide_num == num_threads)
             {
                 need_identify = false;
-                if (best_dist < 1.3 * retsets[i][9].distance)
+                if (best_dist < 1.1 * retsets[i][9].distance)
                 {
                     good_thread[i] = -1;
                     break;
@@ -806,6 +859,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                         continue;
                     flags[id] = true;
                     float dist = distance_func(query, base_data + dimension * id, dimension);
+#ifdef COLLECT_SEARCH_TREE
+                    search_tree[i].push_back(std::make_pair(id, n));
+#endif
 #ifdef RECORD_DIST_COMPS
                     dist_comps++;
 #endif
@@ -843,6 +899,10 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             }
         }
     }
+#ifdef BREAKDOWN_ANALYSIS
+    time_expand_ += get_time_mark();
+    time_merge_ -= get_time_mark();
+#endif
     for (int i = 0; i < num_threads; i++)
     {
         if (i != best_thread_id)
@@ -863,6 +923,14 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                     break;
             }
     }
+#ifdef BREAKDOWN_ANALYSIS
+    time_merge_ += get_time_mark();
+#endif
+    // for (int i = 0; i < num_threads; i++)
+    // {
+    //     std::cout << i << "," << good_thread[i] << std::endl;
+    // }
+    // std::cout << best_thread_id << std::endl;
     for (size_t i = 0; i < K; i++)
     {
         indices[i] = retsets[best_thread_id][i].id;
