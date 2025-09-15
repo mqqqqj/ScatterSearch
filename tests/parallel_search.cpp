@@ -79,7 +79,6 @@ int main(int argc, char **argv)
             // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            flags.reset();
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
@@ -119,10 +118,11 @@ int main(int argc, char **argv)
         engine.dist_comps = 0;
         engine.hop_count = 0;
         test_results.push_back(tr);
-        std::cout << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops,t_expand(s.),t_merge(s.),t_p_expand(%),t_p_merge(%)" << std::endl;
-        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << tr.dist_comps << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << 1000 * engine.time_expand_ / accumulate_latency << "," << 1000 * engine.time_merge_ / accumulate_latency << std::endl;
+        std::cout << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
+        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << tr.dist_comps << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << engine.time_seq_ << "," << 100000 * engine.time_expand_ / accumulate_latency << "," << 100000 * engine.time_merge_ / accumulate_latency << "," << 100000 * engine.time_seq_ / accumulate_latency << std::endl;
         engine.time_expand_ = 0;
         engine.time_merge_ = 0;
+        engine.time_seq_ = 0;
     }
     std::string save_path = "./results/" + dataset_name + "_parallel_" + std::to_string(num_threads) + "t.csv";
     // save_results(test_results, save_path);
