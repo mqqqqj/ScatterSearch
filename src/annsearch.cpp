@@ -1217,3 +1217,176 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
         }
     }
 }
+
+void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
+{
+    int ep = default_ep;
+    std::vector<unsigned> init_ids(L);
+    unsigned tmp_l = 0;
+    for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
+    {
+        init_ids[tmp_l] = graph[ep][tmp_l];
+        flags[init_ids[tmp_l]] = true;
+    }
+    std::vector<Neighbor> retset(L + 1);
+    for (unsigned j = 0; j < tmp_l; j++)
+    {
+        unsigned id = init_ids[j];
+        _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
+        float dist = distance_func(base_data + dimension * id, query, dimension);
+        retset[j] = Neighbor(id, dist, true);
+    }
+    std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
+    int k = 0;
+    int hop = 0;
+    std::vector<std::vector<Neighbor>> local_candidates_per_thread(num_threads);
+    while (k < (int)L)
+    {
+        int nk = L;
+        if (retset[k].unexplored)
+        {
+            retset[k].unexplored = false;
+            unsigned n = retset[k].id;
+            _mm_prefetch(graph[n].data(), _MM_HINT_T0);
+#pragma omp parallel for num_threads(num_threads)
+            for (unsigned m = 0; m < graph[n].size(); ++m)
+            {
+                unsigned id = graph[n][m];
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                if (m + 1 < graph[n].size())
+                {
+                    _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                }
+                float dist = distance_func(query, base_data + dimension * id, dimension);
+                if (dist >= retset[tmp_l - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int tid = omp_get_thread_num();
+                local_candidates_per_thread[tid].push_back(nn);
+            }
+            hop++;
+        }
+        for (int tid = 0; tid < num_threads; ++tid)
+        {
+            auto &local_candidates = local_candidates_per_thread[tid];
+            for (auto &nn : local_candidates)
+            {
+                int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                if (r < nk)
+                    nk = r;
+                if (tmp_l < L)
+                    tmp_l++;
+            }
+            local_candidates.clear(); // 清空供下一轮使用
+        }
+        hop++;
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
+    }
+    for (size_t i = 0; i < K; i++)
+    {
+        indices[i] = retset[i].id;
+    }
+}
+
+void ANNSearch::ModifiedDeltaStepping(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
+{
+    int ep = default_ep;
+    std::vector<unsigned> init_ids;
+    for (int i = 0; i < L && i < graph[ep].size(); ++i)
+    {
+        unsigned id = graph[ep][i];
+        if (flags.test(id))
+            continue;
+        flags.set(id);
+        init_ids.push_back(id);
+    }
+    std::vector<Neighbor> retset;
+    for (unsigned id : init_ids)
+    {
+        _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
+        float dist = distance_func(base_data + dimension * id, query, dimension);
+        retset.emplace_back(id, dist, true);
+    }
+    std::sort(retset.begin(), retset.end());
+    if (retset.size() < L)
+        retset.resize(L);
+    int current_size = static_cast<int>(init_ids.size());
+    bool has_unexplored = true;
+    std::vector<std::vector<Neighbor>> local_candidates(num_threads);
+    std::vector<int> thread_ids(num_threads);
+    while (has_unexplored)
+    {
+        has_unexplored = false;
+        thread_ids.clear();
+        for (int i = 0; i < L && i < current_size; ++i)
+        {
+            if (retset[i].unexplored)
+            {
+                thread_ids.push_back(i);
+                if (thread_ids.size() >= static_cast<size_t>(num_threads))
+                    break;
+            }
+        }
+        if (thread_ids.empty())
+            break;
+        int batch_size = thread_ids.size();
+        for (auto &buf : local_candidates)
+            buf.clear();
+#pragma omp parallel for num_threads(num_threads)
+        for (int b = 0; b < batch_size; ++b)
+        {
+            int tid = omp_get_thread_num();
+            int k = thread_ids[b];
+            unsigned n = retset[k].id;
+            _mm_prefetch(graph[n].data(), _MM_HINT_T0);
+            for (unsigned m = 0; m < graph[n].size(); ++m)
+            {
+                unsigned id = graph[n][m];
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                if (m + 1 < graph[n].size())
+                {
+                    _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
+                }
+                float dist = distance_func(query, base_data + dimension * id, dimension);
+                if (dist >= retset[L - 1].distance && current_size >= L)
+                    continue;
+                local_candidates[tid].emplace_back(id, dist, true);
+            }
+        }
+        int nk = L;
+        for (int tid = 0; tid < num_threads; ++tid)
+        {
+            for (auto &nn : local_candidates[tid])
+            {
+                int r = InsertIntoPool(retset.data(), current_size, nn);
+                if (r < nk)
+                    nk = r;
+                if (current_size < L)
+                    ++current_size;
+            }
+        }
+        for (int idx : thread_ids)
+        {
+            retset[idx].unexplored = false;
+        }
+        for (int i = 0; i < L && i < current_size; ++i)
+        {
+            if (retset[i].unexplored)
+            {
+                has_unexplored = true;
+                break;
+            }
+        }
+    }
+    for (int i = 0; i < K && i < retset.size(); ++i)
+    {
+        indices[i] = retset[i].id;
+    }
+}
