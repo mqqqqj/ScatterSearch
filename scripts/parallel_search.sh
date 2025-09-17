@@ -1,12 +1,12 @@
 cd build && make -j && cd ..
 
 # L_list=(100 150 170 200 250 300 350 400 450 500)
-# L_list=(100 150 200 250 300 350 400 450 500)
+L_list=(100 150 200 250 300 350 400 450 500)
 # L_list=(100)
 # L_list=(750 850)
 
 # for deltastepping and edge-wise
-L_list=(800 1200 1600 2000 2400)
+# L_list=(800 1200 1600 2000 2400)
 
 thread_num=8
 

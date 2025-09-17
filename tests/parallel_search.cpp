@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-
+    std::cout << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
     std::vector<TestResult> test_results;
     // 对每个L值进行搜索
     for (int L : L_list)
@@ -76,18 +76,19 @@ int main(int argc, char **argv)
         {
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
             latency_list[i] = duration.count() / 1000.0f; // 转换为毫秒
             res[i] = tmp;
-            if (i % 1000 == 999)
-            {
-                std::cout << "query " << i << " done" << std::endl;
-            }
+            // if (i % 1000 == 999)
+            // {
+            //     std::cout << "query " << i << " done" << std::endl;
+            // }
         }
         auto e = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = e - s;
@@ -114,11 +115,13 @@ int main(int argc, char **argv)
         float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
         float avg_recall = accumulate_recall / recalls.size();
         std::sort(recalls.begin(), recalls.end());
+        engine.ub_ratio /= query_num;
+        std::cout << "unbalance ratio: " << engine.ub_ratio << std::endl;
+        engine.ub_ratio = 0;
         TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01], (float)engine.dist_comps / query_num, (float)engine.hop_count / (query_num * num_threads)};
         engine.dist_comps = 0;
         engine.hop_count = 0;
         test_results.push_back(tr);
-        std::cout << "L,Throughput,latency,recall,p95recall,p99recall,dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << tr.dist_comps << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << engine.time_seq_ << "," << 100000 * engine.time_expand_ / accumulate_latency << "," << 100000 * engine.time_merge_ / accumulate_latency << "," << 100000 * engine.time_seq_ / accumulate_latency << std::endl;
         engine.time_expand_ = 0;
         engine.time_merge_ = 0;
