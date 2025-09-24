@@ -69,7 +69,6 @@ int main(int argc, char **argv)
     for (int L : L_list)
     {
         boost::dynamic_bitset<> flags{points_num, 0};
-        // std::vector<boost::dynamic_bitset<>> flags(num_threads, boost::dynamic_bitset<>(points_num, 0));
         std::vector<std::vector<unsigned>> res(query_num);
         std::vector<float> latency_list(query_num); // 单位：毫秒
         auto s = std::chrono::high_resolution_clock::now();
@@ -77,8 +76,7 @@ int main(int argc, char **argv)
         {
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            engine.MultiThreadSearchArraySimulation_AnalysisVisitedList(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
