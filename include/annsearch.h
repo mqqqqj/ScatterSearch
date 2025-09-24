@@ -47,6 +47,7 @@ public:
     void SearchArraySimulationForPipelineWithET(const float *query, unsigned query_id, int thread_id, int K, int L, boost::dynamic_bitset<> &flags, std::atomic<bool> &stop, std::vector<std::vector<Neighbor>> &retsets, std::vector<bool> &is_reach_20hop, std::atomic<float> &best_dist, std::atomic<int> &best_thread_id, std::vector<Neighbor> &indices);
     void MultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulation(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
+    void MultiThreadSearchArraySimulation_AnalysisVisitedList(const float *query, unsigned query_id, int K, int L, int num_threads, std::vector<boost::dynamic_bitset<>> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void MultiThreadSearchArraySimulationWithETTopM(const float *query, unsigned query_id, int K, int L, int num_threads, float percentage, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::vector<std::vector<Neighbor>> &retsets, int *good_thread, bool *is_reach_100hop, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors, int64_t &local_dist_comps);
@@ -54,12 +55,14 @@ public:
     void ModifiedDeltaStepping(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
 
 public:
-    std::atomic<int> dist_comps;
     std::atomic<int> hop_count;
     float ub_ratio;
+    int64_t dist_comps;
+    int64_t max_dist_comps;
     double time_expand_;
     double time_merge_;
     double time_seq_;
+    double time_total_;
 #ifdef COLLECT_VISITED_ID
     std::vector<std::vector<unsigned>> visited_lists;
 #endif
