@@ -652,16 +652,22 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
         retsets[i].resize(L + 1);
-        for (int j = 0; j < graph[default_ep].size(); j++)
+        int ep = rand() % base_num;
+        // for (int j = 0; j < graph[default_ep].size(); j++)
+        // {
+        //     if (j % num_threads == i)
+        //     {
+        //         init_ids[tmp_l] = graph[default_ep][j];
+        //         flags[init_ids[tmp_l]] = true;
+        //         tmp_l++;
+        //     }
+        // }
+        for (int j = 0; j < graph[ep].size(); j++)
         {
-            if (j % num_threads == i)
-            {
-                init_ids[tmp_l] = graph[default_ep][j];
-                flags[init_ids[tmp_l]] = true;
-                tmp_l++;
-            }
+            init_ids[tmp_l] = graph[ep][j];
+            flags[init_ids[tmp_l]] = true;
+            tmp_l++;
         }
-
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
@@ -1250,7 +1256,7 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
 void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
 #ifdef BREAKDOWN_ANALYSIS
-    double start = get_time_mark();
+    time_seq_ -= get_time_mark();
 #endif
     int ep = default_ep;
     std::vector<unsigned> init_ids(L);
@@ -1280,23 +1286,17 @@ void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id,
     for (int i = 0; i < num_threads; i++)
         dist_comps_per_thread[i] = 0;
 #ifdef BREAKDOWN_ANALYSIS
-    time_seq_ += get_time_mark() - start;
+    time_seq_ += get_time_mark();
+    time_expand_ -= get_time_mark();
 #endif
     while (k < (int)L)
     {
         int nk = L;
         if (retset[k].unexplored)
         {
-#ifdef BREAKDOWN_ANALYSIS
-            start = get_time_mark();
-#endif
             retset[k].unexplored = false;
             unsigned n = retset[k].id;
             _mm_prefetch(graph[n].data(), _MM_HINT_T0);
-#ifdef BREAKDOWN_ANALYSIS
-            time_seq_ += get_time_mark() - start;
-            start = get_time_mark();
-#endif
 #pragma omp parallel for num_threads(num_threads)
             for (unsigned m = 0; m < graph[n].size(); ++m)
             {
@@ -1319,39 +1319,35 @@ void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id,
 
                 local_candidates_per_thread[tid].push_back(nn);
             }
+#ifdef BREAKDOWN_ANALYSIS
+            time_merge_ -= get_time_mark();
+#endif
+            for (int tid = 0; tid < num_threads; ++tid)
+            {
+                auto &local_candidates = local_candidates_per_thread[tid];
+                for (auto &nn : local_candidates)
+                {
+                    int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                    if (r < nk)
+                        nk = r;
+                    if (tmp_l < L)
+                        tmp_l++;
+                }
+                local_candidates.clear(); // 清空供下一轮使用
+            }
             hop++;
 #ifdef BREAKDOWN_ANALYSIS
-            time_expand_ += get_time_mark() - start;
-            start = get_time_mark();
+            time_merge_ += get_time_mark();
 #endif
         }
-#ifdef BREAKDOWN_ANALYSIS
-        start = get_time_mark();
-#endif
-        for (int tid = 0; tid < num_threads; ++tid)
-        {
-            auto &local_candidates = local_candidates_per_thread[tid];
-            for (auto &nn : local_candidates)
-            {
-                int r = InsertIntoPool(retset.data(), tmp_l, nn);
-                if (r < nk)
-                    nk = r;
-                if (tmp_l < L)
-                    tmp_l++;
-            }
-            local_candidates.clear(); // 清空供下一轮使用
-        }
-        hop++;
         if (nk <= k)
             k = nk;
         else
             ++k;
-#ifdef BREAKDOWN_ANALYSIS
-        time_merge_ += get_time_mark() - start;
-#endif
     }
 #ifdef BREAKDOWN_ANALYSIS
-    start = get_time_mark();
+    time_expand_ += get_time_mark();
+    time_seq_ -= get_time_mark();
 #endif
     for (size_t i = 0; i < K; i++)
     {
@@ -1369,8 +1365,10 @@ void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id,
     }
     max_dist_comps += maxcomps;
     ub_ratio += maxcomps / mincomps;
+    hop *= num_threads;
+    hop_count += hop;
 #ifdef BREAKDOWN_ANALYSIS
-    time_seq_ += get_time_mark() - start;
+    time_seq_ += get_time_mark();
 #endif
 }
 
