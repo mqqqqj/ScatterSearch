@@ -77,8 +77,8 @@ int main(int argc, char **argv)
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
             // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
