@@ -843,21 +843,21 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
-                if (best_dist > retsets[i][9].distance)
+                if (best_dist > retsets[i][K - 1].distance)
                 {
-                    best_dist = retsets[i][9].distance;
+                    best_dist = retsets[i][K - 1].distance;
                     best_thread_id = i;
                 }
             }
             if (need_identify && decide_num == num_threads)
             {
                 need_identify = false;
-                if (best_dist < 1.1 * retsets[i][9].distance)
+                if (best_dist < retsets[i][0].distance)
                 {
                     good_thread[i] = -1;
                     break;
                 }
-                else if (best_dist > 1.02 * retsets[i][9].distance)
+                else if (best_dist > retsets[i][0].distance)
                 {
                     good_thread[i] = 1;
                 }
