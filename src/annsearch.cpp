@@ -5,6 +5,7 @@
 #include <omp.h>
 #include <xmmintrin.h>
 #include <cmath>
+#include <unordered_set>
 
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
@@ -634,8 +635,8 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 #endif
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     int64_t dist_comps_per_thread[num_threads];
-// std::vector<unsigned> ep_list;
-// select_entry_points(30, num_threads, query, ep_list);
+    std::vector<std::vector<int>> find_knn_by_hop(num_threads);
+    std::unordered_set<unsigned> gt_set(groundtruth[query_id].begin(), groundtruth[query_id].begin() + K);
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
 #endif
@@ -652,22 +653,22 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
         retsets[i].resize(L + 1);
-        int ep = rand() % base_num;
-        // for (int j = 0; j < graph[default_ep].size(); j++)
-        // {
-        //     if (j % num_threads == i)
-        //     {
-        //         init_ids[tmp_l] = graph[default_ep][j];
-        //         flags[init_ids[tmp_l]] = true;
-        //         tmp_l++;
-        //     }
-        // }
-        for (int j = 0; j < graph[ep].size(); j++)
+        // int ep = rand() % base_num;
+        for (int j = 0; j < graph[default_ep].size(); j++)
         {
-            init_ids[tmp_l] = graph[ep][j];
-            flags[init_ids[tmp_l]] = true;
-            tmp_l++;
+            if (j % num_threads == i)
+            {
+                init_ids[tmp_l] = graph[default_ep][j];
+                flags[init_ids[tmp_l]] = true;
+                tmp_l++;
+            }
         }
+        // for (int j = 0; j < graph[ep].size(); j++)
+        // {
+        //     init_ids[tmp_l] = graph[ep][j];
+        //     flags[init_ids[tmp_l]] = true;
+        //     tmp_l++;
+        // }
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
@@ -690,6 +691,15 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             int min_r = L;
             if (retsets[i][k].unexplored)
             {
+                // 统计当前已找到的KNN
+                int hit_count = 0;
+                for (int local_idx = 0; local_idx < tmp_l; local_idx++)
+                {
+                    if (gt_set.count(retsets[i][local_idx].id))
+                        hit_count++;
+                }
+                find_knn_by_hop[i].push_back(hit_count);
+                // 正常的搜索过程
                 retsets[i][k].unexplored = false;
                 unsigned n = retsets[i][k].id;
                 _mm_prefetch(graph[n].data(), _MM_HINT_T0);
@@ -755,17 +765,24 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     time_seq_ += get_time_mark();
 #endif
 #ifdef RECORD_DIST_COMPS
-    float mincomps = 1000000, maxcomps = 0;
-    for (int i = 0; i < num_threads; i++)
+    // 将每个线程的 find_knn_by_hop 写入各自的文件
+    for (int tid = 0; tid < num_threads; ++tid)
     {
-        dist_comps += dist_comps_per_thread[i];
-        if (dist_comps_per_thread[i] < mincomps)
-            mincomps = dist_comps_per_thread[i];
-        if (dist_comps_per_thread[i] > maxcomps)
-            maxcomps = dist_comps_per_thread[i];
+        std::string filename = "./plot/thread_" + std::to_string(tid) + "_knn_by_hop_laion_8t.txt";
+        std::ofstream out_file(filename);
+        if (out_file.is_open())
+        {
+            for (const auto &hit_count : find_knn_by_hop[tid])
+            {
+                out_file << hit_count << "\n";
+            }
+            out_file.close();
+        }
+        else
+        {
+            std::cerr << "无法打开文件 " << filename << " 进行写入。\n";
+        }
     }
-    max_dist_comps += maxcomps;
-    ub_ratio += maxcomps / mincomps;
 #endif
 }
 
