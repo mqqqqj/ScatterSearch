@@ -11,6 +11,7 @@
 #include <sstream>
 #include <condition_variable>
 #include <thread>
+#include <immintrin.h> // 推荐：包含所有 Intel 扩展（SSE、AVX等）
 
 struct SearchContext
 {

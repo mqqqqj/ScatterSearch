@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     std::string dataset_name = argv[8];
     if (query_num > 10000)
         query_num = 10000;
-    // query_num = 100;
+    query_num = 1000;
     std::cout << "Groundtruth loaded" << std::endl;
 
     // 检查所有L值是否合法
@@ -144,8 +144,8 @@ int main(int argc, char **argv)
             query_start_times[query_id] = std::chrono::high_resolution_clock::now();
 
             std::vector<unsigned> tmp(K);
-            // engine.MultiThreadSearchArraySimulation(query_ptr, query_id, K, L, num_threads, flags, tmp);
-            engine.MultiThreadSearchArraySimulationWithET(query_ptr, query_id, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulation(query_ptr, query_id, K, L, num_threads, flags, tmp);
+            // engine.MultiThreadSearchArraySimulationWithET(query_ptr, query_id, K, L, num_threads, flags, tmp);
             flags.reset();
 
             // 记录查询结束时间
