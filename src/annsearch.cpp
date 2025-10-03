@@ -5,7 +5,6 @@
 #include <omp.h>
 #include <xmmintrin.h>
 #include <cmath>
-#include <unordered_set>
 
 ANNSearch::ANNSearch(unsigned dim, unsigned num, float *base, Metric m)
 {
@@ -635,19 +634,14 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 #endif
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     int64_t dist_comps_per_thread[num_threads];
-    std::vector<std::vector<int>> find_knn_by_hop(num_threads);
-    std::unordered_set<unsigned> gt_set(groundtruth[query_id].begin(), groundtruth[query_id].begin() + K);
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
 #endif
 #ifdef BREAKDOWN_ANALYSIS
     time_expand_ -= get_time_mark();
 #endif
-
-    std::vector<std::vector<int>> update_position(num_threads);
 #pragma omp parallel num_threads(num_threads)
     {
-        std::vector<unsigned> visited_ids;
         int i = omp_get_thread_num();
         int64_t local_dist_comps = 0;
         std::vector<unsigned> init_ids(L);
@@ -691,15 +685,6 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
             int min_r = L;
             if (retsets[i][k].unexplored)
             {
-                // 统计当前已找到的KNN
-                int hit_count = 0;
-                for (int local_idx = 0; local_idx < tmp_l; local_idx++)
-                {
-                    if (gt_set.count(retsets[i][local_idx].id))
-                        hit_count++;
-                }
-                find_knn_by_hop[i].push_back(hit_count);
-                // 正常的搜索过程
                 retsets[i][k].unexplored = false;
                 unsigned n = retsets[i][k].id;
                 _mm_prefetch(graph[n].data(), _MM_HINT_T0);
@@ -763,26 +748,6 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     flags.reset();
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
-#endif
-#ifdef RECORD_DIST_COMPS
-    // 将每个线程的 find_knn_by_hop 写入各自的文件
-    for (int tid = 0; tid < num_threads; ++tid)
-    {
-        std::string filename = "./plot/thread_" + std::to_string(tid) + "_knn_by_hop_laion_8t.txt";
-        std::ofstream out_file(filename);
-        if (out_file.is_open())
-        {
-            for (const auto &hit_count : find_knn_by_hop[tid])
-            {
-                out_file << hit_count << "\n";
-            }
-            out_file.close();
-        }
-        else
-        {
-            std::cerr << "无法打开文件 " << filename << " 进行写入。\n";
-        }
-    }
 #endif
 }
 
