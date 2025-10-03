@@ -52,7 +52,7 @@ public:
     void SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::vector<std::vector<Neighbor>> &retsets, int *good_thread, bool *is_reach_100hop, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors, int64_t &local_dist_comps);
     void EdgeWiseMultiThreadSearch(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
     void ModifiedDeltaStepping(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
-
+    void MultiTurnSearch(const float *query, unsigned query_id, int K, int L, int num_turns, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices);
 public:
     std::atomic<int> hop_count;
     float ub_ratio;
