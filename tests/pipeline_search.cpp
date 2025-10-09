@@ -74,7 +74,7 @@ int main(int argc, char **argv)
                                            {
                     query_start_times[i][j] = std::chrono::high_resolution_clock::now();
                     int flag_idx = i % flag_pool_size;
-                    engine.SearchArraySimulationForPipeline(query_load + (size_t)i * dim, i, K, L, flags[flag_idx], res[i][j]);
+                    engine.SearchArraySimulationForPipeline(query_load + (size_t)i * dim, i, j, num_threads, K, L, flags[flag_idx], res[i][j]);
                     finish_num[i] ++;
                     if(finish_num[i] == num_threads)
                     {

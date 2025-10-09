@@ -47,12 +47,14 @@ int main(int argc, char **argv)
     }
     int K = atoi(argv[5]);
     int num_threads = atoi(argv[6]);
+    float request_rate = atof(argv[9]); // 每秒查询数
     std::vector<std::vector<unsigned>> groundtruth;
     load_groundtruth(argv[7], groundtruth);
-    if (query_num > 10000)
-        query_num = 10000;
-    // query_num = 100;
+    std::string dataset_name = argv[8];
+    if (query_num > 1000)
+        query_num = 1000;
     std::cout << "Groundtruth loaded" << std::endl;
+
     // 检查所有L值是否合法
     for (int L : L_list)
     {
@@ -65,9 +67,9 @@ int main(int argc, char **argv)
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-    std::string dataset_name = argv[8];
-    float request_rate = atof(argv[9]);
     std::vector<TestResult> test_results;
+    std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
+
     for (int L : L_list)
     {
         // 新增：请求队列和相关同步工具
@@ -103,7 +105,6 @@ int main(int argc, char **argv)
 
                 if (i < query_num)
                 {
-                    // std::this_thread::sleep_for(std::chrono::milliseconds((int)(1000.0 / request_rate)));
                     std::this_thread::sleep_for(std::chrono::duration<float, std::milli>(1000.0 / request_rate));
                 }
             }
@@ -163,15 +164,16 @@ int main(int argc, char **argv)
                                                 unsigned i = query_id;
                         query_search_start_times[i][j] = std::chrono::high_resolution_clock::now();
                         int flag_idx = i % flag_pool_size;
-                        engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], retsets[flag_idx], is_reach_20_hop[flag_idx], best_dist[i], best_thread_id[i], res[i][j]);
+                        int local_ndc = 0;
+                        engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], retsets[flag_idx], is_reach_20_hop[flag_idx], best_dist[i], best_thread_id[i], local_ndc, best_thread_ndc[i], res[i][j]);
                         finish_num[i] ++;
                         // if(finish_num[i] >= num_threads / 2)
                         //     best_thread_finish[i] = true;
                         if(best_thread_id[i] == j)
                         {
                             best_thread_finish[i] = true;
+                            best_thread_ndc[i] = local_ndc;
                             best_thread_finish_order[i] = finish_num[i];
-                            // std::cout << finish_num[i] << std::endl;
                         }
                         if(finish_num[i] == num_threads)
                         {
@@ -201,12 +203,12 @@ int main(int argc, char **argv)
             }
         }
 
-        std::cout << "Waiting for all threads to finish" << std::endl;
+        // std::cout << "Waiting for all threads to finish" << std::endl;
         for (size_t i = 0; i < futures.size(); i++)
         {
             futures[i].get();
         }
-        std::cout << "All threads finished" << std::endl;
+        // std::cout << "All threads finished" << std::endl;
 
         // 等待请求生成线程完成
         request_generator.join();
@@ -263,10 +265,9 @@ int main(int argc, char **argv)
         float qps = query_num / diff.count();
         TestResult tr{L, qps, avg_latency, avg_recall, p95_recall, p99_recall};
         test_results.push_back(tr);
-        std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
     }
-    std::string save_path = "./results/" + dataset_name + "_online_pipeline_" + std::to_string(num_threads) + "t.csv";
-    save_results(test_results, save_path);
+    // std::string save_path = "./results/" + dataset_name + "_online_pipeline_" + std::to_string(num_threads) + "t.csv";
+    // save_results(test_results, save_path);
     return 0;
 }

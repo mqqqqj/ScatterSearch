@@ -104,7 +104,7 @@ int main(int argc, char **argv)
                                                {
                         query_start_times[i][j] = std::chrono::high_resolution_clock::now();
                         int flag_idx = i % flag_pool_size;
-                        engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], retsets[flag_idx], is_reach_20_hop[flag_idx], best_dist[i], best_thread_id[i], res[i][j]);
+                        // engine.SearchArraySimulationForPipelineWithET(query_load + (size_t)i * dim, i, j, K, L, flags[flag_idx], best_thread_finish[i], retsets[flag_idx], is_reach_20_hop[flag_idx], best_dist[i], best_thread_id[i], res[i][j]);
                         finish_num[i] ++;
                         // if(finish_num[i] >= num_threads / 2)
                         //     best_thread_finish[i] = true;

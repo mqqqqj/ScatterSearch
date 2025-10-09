@@ -14,6 +14,7 @@
 struct ThreadParam
 {
     int thread_id;
+    int num_threads;
     ANNSearch *engine;
     const float *query_load;
     unsigned query_num;
@@ -48,6 +49,8 @@ void *search_thread(void *arg)
         param->engine->SearchArraySimulationForPipeline(
             param->query_load + param->dim * query_id,
             query_id,
+            i,
+            param->num_threads,
             param->K,
             param->L,
             *param->flags,
@@ -162,7 +165,8 @@ int main(int argc, char **argv)
         for (int i = 0; i < num_threads; i++)
         {
             thread_params[i] = {
-                i,             // thread_id
+                i, // thread_id
+                num_threads,
                 &engine,       // engine
                 query_load,    // query_load
                 query_num,     // query_num

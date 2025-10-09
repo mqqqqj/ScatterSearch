@@ -22,6 +22,9 @@ target_link_libraries(pipeline_search ${PROJECT_NAME} -fopenmp)
 add_executable(pipeline_et_search pipeline_et_search.cpp)
 target_link_libraries(pipeline_et_search ${PROJECT_NAME} -fopenmp)
 
+add_executable(online_pipeline_search online_pipeline_search.cpp)
+target_link_libraries(online_pipeline_search ${PROJECT_NAME} -fopenmp)
+
 add_executable(online_pipeline_et_search online_pipeline_et_search.cpp)
 target_link_libraries(online_pipeline_et_search ${PROJECT_NAME} -fopenmp)
 

@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     std::string dataset_name = argv[8];
     if (query_num > 10000)
         query_num = 10000;
-    query_num = 1000;
+    // query_num = 1000;
     std::cout << "Groundtruth loaded" << std::endl;
 
     // 检查所有L值是否合法
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-    std::cout << "L,Throughput,latency,recall,p95recall,p99recall,total_dist_comps,max_dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
+    std::cout << "L,Throughput,latency,recall,p95recall,p99recall,p95latency,p99latency,total_dist_comps,max_dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
     std::vector<TestResult> test_results;
     // 对每个L值进行搜索
     for (int L : L_list)
@@ -76,9 +76,9 @@ int main(int argc, char **argv)
         {
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -90,6 +90,10 @@ int main(int argc, char **argv)
         float qps = query_num / diff.count();
         float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
         float avg_latency = accumulate_latency / latency_list.size();
+        std::sort(latency_list.begin(), latency_list.end());
+        float p95latency = latency_list[latency_list.size() * 0.95];
+        float p99latency = latency_list[latency_list.size() * 0.99];
+
         std::vector<float> recalls(query_num);
         for (unsigned i = 0; i < query_num; i++)
         {
@@ -116,7 +120,7 @@ int main(int argc, char **argv)
         TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01], (float)engine.dist_comps / query_num, (float)engine.hop_count / (query_num * num_threads)};
 
         test_results.push_back(tr);
-        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << tr.dist_comps << "," << (float)engine.max_dist_comps / query_num << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << engine.time_seq_ << "," << 100000 * engine.time_expand_ / accumulate_latency << "," << 100000 * engine.time_merge_ / accumulate_latency << "," << 100000 * engine.time_seq_ / accumulate_latency << std::endl;
+        std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << "," << p95latency << "," << p99latency << "," << tr.dist_comps << "," << (float)engine.max_dist_comps / query_num << "," << tr.hops << "," << engine.time_expand_ << "," << engine.time_merge_ << "," << engine.time_seq_ << "," << 100000 * engine.time_expand_ / accumulate_latency << "," << 100000 * engine.time_merge_ / accumulate_latency << "," << 100000 * engine.time_seq_ / accumulate_latency << std::endl;
         engine.dist_comps = 0;
         engine.max_dist_comps = 0;
         engine.hop_count = 0;
@@ -124,7 +128,7 @@ int main(int argc, char **argv)
         engine.time_merge_ = 0;
         engine.time_seq_ = 0;
     }
-    std::string save_path = "./results/" + dataset_name + "_parallel_" + std::to_string(num_threads) + "t.csv";
+    // std::string save_path = "./results/" + dataset_name + "_parallel_" + std::to_string(num_threads) + "t.csv";
     // save_results(test_results, save_path);
     return 0;
 }

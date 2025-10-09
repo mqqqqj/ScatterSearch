@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <chrono>
 #include <numeric>
+#include <ThreadPool.h>
 #include <sstream>
 #include <queue>              // 新增：引入队列
 #include <mutex>              // 新增：引入互斥锁
@@ -26,7 +27,6 @@ int main(int argc, char **argv)
                   << " data_file query_file nsg_path search_L_list search_K num_threads gt_path dataset_name request_rate"
                   << std::endl;
         std::cout << "search_L_list format: L1,L2,L3,... (comma separated values)" << std::endl;
-        std::cout << "request_rate: queries per second" << std::endl;
         exit(-1);
     }
     float *data_load = nullptr;
@@ -36,7 +36,6 @@ int main(int argc, char **argv)
     unsigned query_num, query_dim;
     load_fbin(argv[2], query_load, query_num, query_dim);
     assert(dim == query_dim);
-
     // 解析L_list
     std::vector<int> L_list;
     std::string L_str = argv[4];
@@ -46,7 +45,6 @@ int main(int argc, char **argv)
     {
         L_list.push_back(std::stoi(L_val));
     }
-
     int K = atoi(argv[5]);
     int num_threads = atoi(argv[6]);
     float request_rate = atof(argv[9]); // 每秒查询数
@@ -66,13 +64,10 @@ int main(int argc, char **argv)
             exit(-1);
         }
     }
-
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
-
     std::vector<TestResult> test_results;
-    // 对每个L值进行搜索
     std::cout << "L,Throughput,latency,recall,p95recall,p99recall" << std::endl;
 
     for (int L : L_list)
@@ -83,11 +78,9 @@ int main(int argc, char **argv)
         std::condition_variable queue_cv;
         bool done = false;
         std::vector<std::chrono::high_resolution_clock::time_point> query_receive_time(query_num);
-        std::vector<std::chrono::high_resolution_clock::time_point> query_start_times(query_num);
-        std::vector<std::chrono::high_resolution_clock::time_point> query_end_times(query_num);
+        std::vector<std::vector<std::chrono::high_resolution_clock::time_point>> query_search_start_times(query_num, std::vector<std::chrono::high_resolution_clock::time_point>(num_threads));
+        std::vector<std::vector<std::chrono::high_resolution_clock::time_point>> query_search_end_times(query_num, std::vector<std::chrono::high_resolution_clock::time_point>(num_threads));
         unsigned batch_size = 1; // batch_size可根据需求调整
-
-        // 查询发送线程
         std::thread request_generator([&]()
                                       {
             unsigned i = 0;
@@ -120,14 +113,26 @@ int main(int argc, char **argv)
                 done = true;
                 queue_cv.notify_all();
             } });
-
-        boost::dynamic_bitset<> flags{points_num, 0};
-        std::vector<std::vector<unsigned>> res(query_num);
         std::vector<float> latency_list(query_num); // 单位：毫秒
-
+        std::vector<float> queueing_time_list(query_num);
+        std::vector<float> processing_time_list(query_num);
+        ThreadPool pool(num_threads);
+        std::vector<std::future<void>> futures;
+        std::vector<std::vector<std::vector<Neighbor>>> res(query_num, std::vector<std::vector<Neighbor>>(num_threads));
+        // for early termination
+        std::atomic<int> finish_num[query_num];
+        for (unsigned i = 0; i < query_num; i++)
+        {
+            finish_num[i] = 0;
+        }
         auto s = std::chrono::high_resolution_clock::now();
-
-        // 处理线程
+        int flag_pool_size = 20;
+        std::vector<boost::dynamic_bitset<>> flags(flag_pool_size);
+        for (unsigned i = 0; i < flag_pool_size; i++)
+        {
+            flags[i] = boost::dynamic_bitset<>(points_num, 0);
+        }
+        std::vector<std::vector<std::vector<Neighbor>>> retsets(flag_pool_size, std::vector<std::vector<Neighbor>>(num_threads, std::vector<Neighbor>(L + 1)));
         while (true)
         {
             std::unique_lock<std::mutex> lock(queue_mutex);
@@ -140,31 +145,68 @@ int main(int argc, char **argv)
             float *query_ptr = item.second;
             request_queue.pop_front(); // 使用 pop_front
             lock.unlock();
-
-            // 记录查询开始时间
-            query_start_times[query_id] = std::chrono::high_resolution_clock::now();
-
-            std::vector<unsigned> tmp(K);
-            engine.MultiThreadSearchArraySimulation(query_ptr, query_id, K, L, num_threads, flags, tmp);
-            // engine.MultiThreadSearchArraySimulationWithET(query_ptr, query_id, K, L, num_threads, flags, tmp);
-            // 记录查询结束时间
-            query_end_times[query_id] = std::chrono::high_resolution_clock::now();
-
-            // 计算延迟：从入队时间到完成时间
-            auto latency = std::chrono::duration_cast<std::chrono::microseconds>(
-                               query_end_times[query_id] - query_receive_time[query_id])
-                               .count() /
-                           1000.0f;
-            latency_list[query_id] = latency;
-            res[query_id] = tmp;
+            for (int j = 0; j < num_threads; j++)
+            {
+                futures.push_back(pool.enqueue([&, query_id, j, query_ptr]()
+                                               {
+                                                unsigned i = query_id;
+                        query_search_start_times[i][j] = std::chrono::high_resolution_clock::now();
+                        int flag_idx = i % flag_pool_size;
+                        engine.SearchArraySimulationForPipeline(query_load + (size_t)i * dim, i, j, num_threads, K, L, flags[flag_idx], res[i][j]);
+                        finish_num[i] ++;
+                        if(finish_num[i] == num_threads)
+                        {
+                            flags[flag_idx].reset();
+                            // merge result
+                            for (unsigned t = 1; t < num_threads; t++)
+                            {
+                                for (unsigned k = 0; k < K; k++)
+                                {
+                                    int r = InsertIntoPool(res[i][0].data(), K, res[i][t][k]);
+                                    if (r == K)
+                                        break;
+                                }
+                            }
+                        }
+                        query_search_end_times[i][j] = std::chrono::high_resolution_clock::now(); }));
+            }
         }
+
+        // std::cout << "Waiting for all threads to finish" << std::endl;
+        for (size_t i = 0; i < futures.size(); i++)
+        {
+            futures[i].get();
+        }
+        // std::cout << "All threads finished" << std::endl;
 
         // 等待请求生成线程完成
         request_generator.join();
 
         auto e = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = e - s;
-        float qps = query_num / diff.count();
+        std::vector<float> start_time_diffs(query_num);
+        for (unsigned i = 0; i < query_num; i++)
+        {
+            auto earliest_start = *std::min_element(query_search_start_times[i].begin(), query_search_start_times[i].end());
+            auto latest_start = *std::max_element(query_search_start_times[i].begin(), query_search_start_times[i].end());
+            auto latest_end = *std::max_element(query_search_end_times[i].begin(), query_search_end_times[i].end());
+            start_time_diffs[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                                      latest_start - earliest_start)
+                                      .count() /
+                                  1000.0f;
+            processing_time_list[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                                          latest_end - earliest_start)
+                                          .count() /
+                                      1000.0f;
+            queueing_time_list[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                                        earliest_start - query_receive_time[i])
+                                        .count() /
+                                    1000.0f;
+            latency_list[i] = std::chrono::duration_cast<std::chrono::microseconds>(
+                                  latest_end - query_receive_time[i])
+                                  .count() /
+                              1000.0f;
+        }
         float accumulate_latency = std::accumulate(latency_list.begin(), latency_list.end(), 0.0f);
         float avg_latency = accumulate_latency / latency_list.size();
         std::vector<float> recalls(query_num);
@@ -175,7 +217,7 @@ int main(int argc, char **argv)
             {
                 for (unsigned g = 0; g < K; g++)
                 {
-                    if (res[i][j] == groundtruth[i][g])
+                    if (res[i][0][j].id == groundtruth[i][g])
                     {
                         correct++;
                         break;
@@ -187,17 +229,14 @@ int main(int argc, char **argv)
         float accumulate_recall = std::accumulate(recalls.begin(), recalls.end(), 0.0f);
         float avg_recall = accumulate_recall / recalls.size();
         std::sort(recalls.begin(), recalls.end());
-        TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01]};
+        float p95_recall = recalls[recalls.size() * 0.05];
+        float p99_recall = recalls[recalls.size() * 0.01];
+        float qps = query_num / diff.count();
+        TestResult tr{L, qps, avg_latency, avg_recall, p95_recall, p99_recall};
         test_results.push_back(tr);
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
-        engine.dist_comps = 0;
-        engine.max_dist_comps = 0;
-        engine.hop_count = 0;
-        engine.time_expand_ = 0;
-        engine.time_merge_ = 0;
-        engine.time_seq_ = 0;
     }
-    // std::string save_path = "./results/" + dataset_name + "_online_parallel_" + std::to_string(num_threads) + "t.csv";
+    // std::string save_path = "./results/" + dataset_name + "_online_pipeline_" + std::to_string(num_threads) + "t.csv";
     // save_results(test_results, save_path);
     return 0;
 }

@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     engine.LoadGroundtruth(argv[6]);
     std::vector<TestResult> test_results;
     // 对每个L值进行搜索
-    query_num = 1000;
+    std::cout << "L,Throughput,latency,dist_comps,recall,p95recall,p99recall" << std::endl;
     for (int L : L_list)
     {
         boost::dynamic_bitset<> flags{points_num, 0};
@@ -109,7 +109,6 @@ int main(int argc, char **argv)
         std::sort(recalls.begin(), recalls.end());
         TestResult tr{L, qps, avg_latency, avg_recall, recalls[recalls.size() * 0.05], recalls[recalls.size() * 0.01]};
         test_results.push_back(tr);
-        std::cout << "L,Throughput,latency,dist_comps,recall,p95recall,p99recall" << std::endl;
         std::cout << tr.L << "," << tr.throughput << "," << tr.latency << "," << (float)engine.dist_comps / query_num << "," << tr.recall << "," << tr.p95_recall << "," << tr.p99_recall << std::endl;
         engine.dist_comps = 0;
     }

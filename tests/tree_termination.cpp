@@ -120,6 +120,8 @@ void distribute_and_execute(ThreadParam *param, WorkItem work)
     param->engine->SearchArraySimulationForPipeline(
         param->query_load + param->dim * start_idx,
         start_idx,
+        thread_id,
+        param->num_total_threads,
         param->K,
         param->L,
         flags,
