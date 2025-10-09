@@ -647,6 +647,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     time_seq_ -= get_time_mark();
 #endif
     std::vector<std::vector<Neighbor>> retsets(num_threads);
+    std::vector<unsigned> retset_size(num_threads);
     int64_t dist_comps_per_thread[num_threads];
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
@@ -658,9 +659,9 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
     {
         int i = omp_get_thread_num();
         int64_t local_dist_comps = 0;
-        std::vector<unsigned> init_ids(L);
+        std::vector<unsigned> init_ids(K);
         unsigned tmp_l = 0;
-        retsets[i].resize(L + 1);
+        retsets[i].resize(K + 1);
         // int ep = rand() % base_num;
         for (int j = 0; j < graph[default_ep].size(); j++)
         {
@@ -723,7 +724,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                         continue;
                     Neighbor nn(id, dist, true);
                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
-                    if (tmp_l < L)
+                    if (tmp_l < K)
                         tmp_l++;
                     if (r < nk)
                         nk = r;
@@ -737,6 +738,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         }
         hop_count += hop;
         dist_comps_per_thread[i] = local_dist_comps;
+        retset_size[i] = tmp_l;
     }
 #ifdef BREAKDOWN_ANALYSIS
     time_expand_ += get_time_mark();
@@ -744,7 +746,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 #endif
     for (int i = 1; i < num_threads; i++)
     {
-        for (size_t j = 0; j < K; j++)
+        for (size_t j = 0; j < retset_size[i]; j++)
         {
             int pos = InsertIntoPool(retsets[0].data(), K, retsets[i][j]);
             if (pos == K)
@@ -786,6 +788,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
+    std::vector<unsigned> retset_size(num_threads);
     int best_thread_id = -1;
     std::atomic<int> decide_num;
     decide_num = 0;
@@ -809,10 +812,10 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         int i = omp_get_thread_num();
         int hop = 0;
         int64_t local_dist_comps = 0;
-        std::vector<unsigned> init_ids(L);
+        std::vector<unsigned> init_ids(K);
         bool need_identify = true;
         unsigned tmp_l = 0;
-        retsets[i].resize(L + 1);
+        retsets[i].resize(K + 1);
         for (int j = 0; j < graph[default_ep].size(); j++)
         {
             if (j % num_threads == i)
@@ -848,13 +851,13 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 50)
+            if (hop == 10)
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
-                if (best_dist > retsets[i][K - 1].distance)
+                if (best_dist > retsets[i][9].distance)
                 {
-                    best_dist = retsets[i][K - 1].distance;
+                    best_dist = retsets[i][9].distance;
                     best_thread_id = i;
                 }
             }
@@ -892,7 +895,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                         continue;
                     Neighbor nn(id, dist, true);
                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
-                    if (tmp_l < L)
+                    if (tmp_l < K)
                         tmp_l++;
                     if (r < nk)
                         nk = r;
@@ -922,6 +925,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             }
         }
         dist_comps_per_thread[i] = local_dist_comps;
+        retset_size[i] = tmp_l;
     }
 #ifdef BREAKDOWN_ANALYSIS
     time_expand_ += get_time_mark();
@@ -930,7 +934,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     for (int i = 0; i < num_threads; i++)
     {
         if (i != best_thread_id)
-            for (size_t j = 0; j < K; j++)
+            for (size_t j = 0; j < retset_size[i]; j++)
             {
                 int pos = InsertIntoPool(retsets[best_thread_id].data(), K, retsets[i][j]);
                 if (pos == K)
