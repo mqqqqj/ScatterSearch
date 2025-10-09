@@ -22,12 +22,12 @@ thread_num=8
 # "$L_str" 100 "$thread_num" /SSD/Glove200/gt.query.top100.bin "glove" | tee -a /home/mqj/proj/ANNSLib/experiments/glove_8t_edgewise.csv
 
 #mainsearch
-L_list=(100 200 300 400 500 700 900 1100 1400 1600 1800 2000 2200 2400 2600 2800 3000 3200 3400 3600 3800 4000 4200)
-L_str=$(IFS=,; echo "${L_list[*]}")
-taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/MainSearch/base.fbin \
-/SSD/MainSearch/query_test_unique.fbin \
-/SSD/models/nsg/mainsearch.L2000.R64.C2000.nsg \
-"$L_str" 100 "$thread_num" /SSD/MainSearch/gt.test_unique.bin "mainsearch" | tee -a /home/mqj/proj/ANNSLib/experiments/mainsearch_8t_edgewise.csv
+# L_list=(100 200 300 400 500 700 900 1100 1400 1600 1800 2000 2200 2400 2600 2800 3000 3200 3400 3600 3800 4000 4200)
+# L_str=$(IFS=,; echo "${L_list[*]}")
+# taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/MainSearch/base.fbin \
+# /SSD/MainSearch/query_test_unique.fbin \
+# /SSD/models/nsg/mainsearch.L2000.R64.C2000.nsg \
+# "$L_str" 100 "$thread_num" /SSD/MainSearch/gt.test_unique.bin "mainsearch" | tee -a /home/mqj/proj/ANNSLib/experiments/mainsearch_8t_edgewise.csv
 
 #text-to-image
 # L_list=(200 300 400 500 700 900 1100 1400 1600 1800 2000 2200 2400 2600 2800 3000 3200 3400 3600 3800 4000 4200)
@@ -46,12 +46,12 @@ taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/MainSearch/b
 # "$L_str" 100 "$thread_num" /SSD/WebVid/gt.query.top100.bin "webvid" | tee -a /home/mqj/proj/ANNSLib/experiments/webvid_8t_edgewise.csv
 
 #GIST
-# L_list=(100 125 150 175 200 225 250 275 300 325 350 375 400 425 450 475 500 525 550 575 600)
-# L_str=$(IFS=,; echo "${L_list[*]}")
-# taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/GIST1M/base.fbin \
-# /SSD/GIST1M/query.fbin \
-# /SSD/models/nsg/gist1m.L2000.R64.C200.nsg \
-# "$L_str" 100 "$thread_num" /SSD/GIST1M/gt.query.top100.bin "gist" | tee -a /home/mqj/proj/ANNSLib/experiments/gist_8t_edgewise.csv
+L_list=(100 125 150 175 200 225 250 275)
+L_str=$(IFS=,; echo "${L_list[*]}")
+taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/GIST1M/base.fbin \
+/SSD/GIST1M/query.fbin \
+/SSD/models/nsg/gist1m.L2000.R64.C200.nsg \
+"$L_str" 100 "$thread_num" /SSD/GIST1M/gt.query.top100.bin "gist" | tee -a /home/mqj/proj/ANNSLib/experiments/gist_8t_edgewise.csv
 
 #openai
 # L_list=(100 125 150 175 200 225 250 275 300 325 350 375 400 425 450 475 500 525 550 575 600)
