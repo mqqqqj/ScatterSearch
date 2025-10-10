@@ -60,7 +60,7 @@ int main(int argc, char **argv)
         }
     }
 
-    ANNSearch engine(dim, points_num, data_load, L2);
+    ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
     engine.LoadGroundtruth(argv[7]);
     std::cout << "L,Throughput,latency,recall,p95recall,p99recall,p95latency,p99latency,total_dist_comps,max_dist_comps,hops,t_expand(s.),t_merge(s.),t_seq(s.),t_p_expand(%),t_p_merge(%),t_p_seq(%)" << std::endl;
@@ -77,8 +77,8 @@ int main(int argc, char **argv)
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
             // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
