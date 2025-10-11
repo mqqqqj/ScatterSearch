@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     std::string dataset_name = argv[8];
     if (query_num > 10000)
         query_num = 10000;
-    // query_num = 1000;
+    query_num = 1000;
     std::cout << "Groundtruth loaded" << std::endl;
 
     // 检查所有L值是否合法
