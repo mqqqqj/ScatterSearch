@@ -851,7 +851,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 10)
+            if (hop == 25)
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
