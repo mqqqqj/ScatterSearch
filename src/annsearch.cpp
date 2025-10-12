@@ -921,9 +921,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         {
             if (best_thread_finish == false)
             {
-                // std::vector<Neighbor> new_retset;
-                // SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, new_retset, local_dist_comps);
-                // new_retsets[i] = new_retset;
+                std::vector<Neighbor> new_retset(L + 1);
+                SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, retsets[i], tmp_l, local_dist_comps);
+                new_retsets[i] = new_retset;
             }
         }
         dist_comps_per_thread[i] = local_dist_comps;
@@ -942,16 +942,16 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                     break;
             }
     }
-    for (size_t i = 0; i < new_retsets.size(); i++)
-    {
-        if (new_retsets[i].size())
-            for (int j = 0; j < K; j++)
-            {
-                int pos = InsertIntoPool(retsets[best_thread_id].data(), K, new_retsets[i][j]);
-                if (pos == K)
-                    break;
-            }
-    }
+    // for (size_t i = 0; i < new_retsets.size(); i++)
+    // {
+    //     if (new_retsets[i].size())
+    //         for (int j = 0; j < K; j++)
+    //         {
+    //             int pos = InsertIntoPool(retsets[best_thread_id].data(), K, new_retsets[i][j]);
+    //             if (pos == K)
+    //                 break;
+    //         }
+    // }
 #ifdef BREAKDOWN_ANALYSIS
     time_merge_ += get_time_mark();
 #endif
@@ -1138,132 +1138,63 @@ void ANNSearch::MultiThreadSearchArraySimulationWithETTopM(const float *query, u
     }
 }
 
-void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::vector<std::vector<Neighbor>> &main_retsets, int *good_thread, bool *is_reach_100hop, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &neighbors, int64_t &local_dist_comps)
+void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id, int K, int L, std::vector<std::vector<Neighbor>> &main_retsets, int *good_thread, bool *is_reach_100hop, std::atomic<bool> &best_thread_finish, std::atomic<float> &best_dist, boost::dynamic_bitset<> &flags, std::vector<Neighbor> &retset, unsigned &tmp_l, int64_t &local_dist_comps)
 {
-    std::vector<std::vector<Neighbor>> retsets;
     std::vector<int> retset_size;
-    int current_turn = 0;
-    while (current_turn < 10) // true
+    int good_id_num = 0;
+    int thread_num = main_retsets.size();
+    int i = rand() % thread_num;
+    if (is_reach_100hop[i] && good_thread[i] == 1)
     {
+        for (int idx = L - 1; idx; idx--)
+        {
+            if (main_retsets[i][idx].unexplored == true)
+            {
+                InsertIntoPool(retset.data(), tmp_l, main_retsets[i][idx]);
+                good_id_num++;
+            }
+            if (good_id_num > 10)
+            {
+                break;
+            }
+        }
+    }
+    int k = 0;
+    int hop = 0;
+    while ((k < (int)L))
+    {
+        int nk = L;
         if (best_thread_finish)
-        {
             break;
-        }
-        std::vector<Neighbor> retset(L + 1);
-        retsets.push_back(retset);
-        retset_size.push_back(0);
-        int &tmp_l = retset_size[current_turn];
-        int thread_num = main_retsets.size();
-        while (tmp_l < 10)
+        if (retset[k].unexplored)
         {
-            if (best_thread_finish)
+            retset[k].unexplored = false;
+            unsigned n = retset[k].id;
+            for (unsigned m = 0; m < graph[n].size(); ++m)
             {
-                break;
-            }
-            for (int i = 0; i < thread_num; i++)
-            {
-                if (is_reach_100hop[i] && good_thread[i] == 1)
-                {
-                    int idx = rand() % 100;
-                    if (main_retsets[i][idx].unexplored == true)
-                    {
-                        retsets[current_turn][tmp_l] = main_retsets[i][idx];
-                        tmp_l++;
-                    }
-                }
-            }
-        }
-        int ep = rand() % base_num;
-        for (; tmp_l < L && tmp_l < graph[ep].size(); tmp_l++)
-        {
-            unsigned id = graph[ep][tmp_l];
-            if (flags[id])
-                continue;
-            flags[id] = true;
-            float dist = distance_func(base_data + dimension * id, query, dimension);
+                unsigned id = graph[n][m];
+                if (flags[id])
+                    continue;
+                flags[id] = true;
+                float dist = distance_func(base_data + dimension * id, query, dimension);
 #ifdef RECORD_DIST_COMPS
-            local_dist_comps++;
+                local_dist_comps++;
 #endif
-            retsets[current_turn][tmp_l] = Neighbor(id, dist, true);
-        }
-        std::sort(retsets[current_turn].begin(), retsets[current_turn].begin() + tmp_l);
-        int k = 0;
-        int hop = 0;
-        while ((k < (int)L))
-        {
-            int nk = L;
-            if (best_thread_finish)
-                break;
-            // if(hop == 20 && best_dist < 1.2 * retsets[current_turn][0].distance)
-            // {
-            //     break;
-            // }
-            if (retsets[current_turn][k].unexplored)
-            {
-                retsets[current_turn][k].unexplored = false;
-                unsigned n = retsets[current_turn][k].id;
-                for (unsigned m = 0; m < graph[n].size(); ++m)
-                {
-                    unsigned id = graph[n][m];
-                    if (flags[id])
-                        continue;
-                    flags[id] = true;
-                    float dist = distance_func(base_data + dimension * id, query, dimension);
-#ifdef RECORD_DIST_COMPS
-                    local_dist_comps++;
-#endif
-                    if (dist >= retsets[current_turn][tmp_l - 1].distance)
-                        continue;
-                    Neighbor nn(id, dist, true);
-                    int r = InsertIntoPool(retsets[current_turn].data(), tmp_l, nn);
-                    if (tmp_l < L)
-                        tmp_l++;
-                    if (r < nk)
-                        nk = r;
-                }
-                hop++;
+                if (dist >= retset[tmp_l - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int r = InsertIntoPool(retset.data(), tmp_l, nn);
+                if (tmp_l < L)
+                    tmp_l++;
+                if (r < nk)
+                    nk = r;
             }
-            if (nk <= k)
-                k = nk;
-            else
-                ++k;
+            hop++;
         }
-        // evaluate recall@100
-        // int correct = 0;
-        // for (int i = 0; i < K; i++)
-        // {
-        //     for (int j = 0; j < K; j++)
-        //     {
-        //         if (retsets[current_turn][i].id == groundtruth[query_id][j])
-        //         {
-        //             correct++;
-        //             break;
-        //         }
-        //     }
-        // }
-        // std::cout << "query " << query_id << ", turn " << current_turn << ", recall: " << (float)correct / K << std::endl;
-        current_turn++;
-    }
-    int master = -1;
-    for (size_t i = 0; i < retsets.size(); i++)
-    {
-        if (retset_size[i] >= K)
-            master = i;
-    }
-    if (master != -1)
-    {
-        for (size_t i = 0; i < retsets.size(); i++)
-        {
-            for (size_t j = 0; j < retset_size[i]; j++)
-            {
-                InsertIntoPool(retsets[master].data(), K, retsets[i][j]);
-            }
-        }
-        neighbors.resize(K);
-        for (size_t i = 0; i < K; i++)
-        {
-            neighbors[i] = retsets[master][i];
-        }
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
     }
 }
 
