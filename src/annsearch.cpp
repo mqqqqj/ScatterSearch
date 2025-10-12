@@ -800,6 +800,11 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     int64_t dist_comps_per_thread[num_threads];
     // std::vector<unsigned> ep_list;
     // select_entry_points(30, num_threads, query, ep_list);
+    int election_hop = 50;
+    if (L < 50)
+    {
+        election_hop = L;
+    }
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
     time_expand_ -= get_time_mark();
@@ -848,7 +853,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 50)
+            if (hop == election_hop)
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
