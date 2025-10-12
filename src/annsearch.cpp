@@ -803,6 +803,11 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     int64_t dist_comps_per_thread[num_threads];
     // std::vector<unsigned> ep_list;
     // select_entry_points(30, num_threads, query, ep_list);
+    int election_hop = 50;
+    if (L < 50)
+    {
+        election_hop = L;
+    }
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
     time_expand_ -= get_time_mark();
@@ -832,6 +837,15 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         //     flags[init_ids[tmp_l]] = true;
         //     tmp_l++;
         // }
+        while (tmp_l < 20)
+        {
+            unsigned id = rand() % base_num;
+            if (flags[id])
+                continue;
+            init_ids[tmp_l] = id;
+            flags[init_ids[tmp_l]] = true;
+            tmp_l++;
+        }
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
@@ -851,13 +865,13 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             int nk = L;
             if (best_thread_finish)
                 break;
-            if (hop == 10)
+            if (hop == election_hop)
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
-                if (best_dist > retsets[i][9].distance)
+                if (best_dist > retsets[i][19].distance)
                 {
-                    best_dist = retsets[i][9].distance;
+                    best_dist = retsets[i][19].distance;
                     best_thread_id = i;
                 }
             }
