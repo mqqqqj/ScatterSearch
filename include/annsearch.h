@@ -14,10 +14,10 @@
 #define AVX
 // #define SSE
 
-#define RECORD_DIST_COMPS
+// #define RECORD_DIST_COMPS
 // #define COLLECT_VISITED_ID
 // #define COLLECT_SEARCH_TREE
-#define BREAKDOWN_ANALYSIS
+// #define BREAKDOWN_ANALYSIS
 
 enum Metric
 {

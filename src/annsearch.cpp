@@ -661,7 +661,6 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
         retsets[i].resize(L + 1);
-        // int ep = rand() % base_num;
         for (int j = 0; j < graph[default_ep].size(); j++)
         {
             if (j % num_threads == i)
@@ -671,6 +670,7 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
                 tmp_l++;
             }
         }
+        // int ep = rand() % base_num;
         // for (int j = 0; j < graph[ep].size(); j++)
         // {
         //     init_ids[tmp_l] = graph[ep][j];
@@ -783,7 +783,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ -= get_time_mark();
 #endif
-
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
     int best_thread_id = -1;
@@ -800,11 +799,11 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     int64_t dist_comps_per_thread[num_threads];
     // std::vector<unsigned> ep_list;
     // select_entry_points(30, num_threads, query, ep_list);
-    int election_hop = 200;
-    if (L <= election_hop)
-    {
-        election_hop = L - 50;
-    }
+    int election_hop = 50;
+    // if (L <= election_hop)
+    // {
+    //     election_hop = L - 50;
+    // }
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
     time_expand_ -= get_time_mark();
@@ -812,7 +811,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
-        int hop = 1;
+        int hop = 0;
         int64_t local_dist_comps = 0;
         std::vector<unsigned> init_ids(L);
         bool need_identify = true;
@@ -1133,6 +1132,35 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
     std::vector<int> retset_size;
     int good_id_num = 0;
     int thread_num = main_retsets.size();
+    int steal_target = -1;
+    for (int round = 0; round < 10; round++)
+    {
+        if (best_thread_finish)
+            break;
+        int i = rand() % thread_num;
+        if (is_reach_100hop[i] && good_thread[i] == 1)
+        {
+            steal_target = i;
+            break;
+        }
+    }
+    if (steal_target != -1)
+    {
+        for (int idx = L - 1; idx; idx--)
+        {
+            if (main_retsets[steal_target][idx].unexplored == true)
+            {
+                InsertIntoPool(retset.data(), tmp_l, main_retsets[steal_target][idx]);
+                main_retsets[steal_target][idx].unexplored = false;
+                good_id_num++;
+            }
+            // if (good_id_num > 50)
+            // {
+            //     break;
+            // }
+        }
+    }
+    // std::cout << good_id_num << std::endl;
     int i = rand() % thread_num;
     if (is_reach_100hop[i] && good_thread[i] == 1)
     {
@@ -1298,6 +1326,7 @@ void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id,
         indices[i] = retset[i].id;
     }
     flags.reset();
+#ifdef BREAKDOWN_ANALYSIS
     float mincomps = 1000000, maxcomps = 0;
     for (int i = 0; i < num_threads; i++)
     {
@@ -1311,7 +1340,7 @@ void ANNSearch::EdgeWiseMultiThreadSearch(const float *query, unsigned query_id,
     ub_ratio += maxcomps / mincomps;
     hop *= num_threads;
     hop_count += hop;
-#ifdef BREAKDOWN_ANALYSIS
+
     time_seq_ += get_time_mark();
 #endif
 }
@@ -1445,6 +1474,7 @@ void ANNSearch::ModifiedDeltaStepping(const float *query, unsigned query_id, int
     {
         indices[i] = retset[i].id;
     }
+#ifdef BREAKDOWN_ANALYSIS
     float mincomps = 1000000, maxcomps = 0;
     for (int i = 0; i < num_threads; i++)
     {
@@ -1457,7 +1487,7 @@ void ANNSearch::ModifiedDeltaStepping(const float *query, unsigned query_id, int
     max_dist_comps += maxcomps;
     ub_ratio += maxcomps / mincomps;
     flags.reset();
-#ifdef BREAKDOWN_ANALYSIS
+
     time_seq_ += get_time_mark();
 #endif
 }
