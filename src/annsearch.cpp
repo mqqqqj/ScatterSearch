@@ -919,12 +919,12 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         }
         else
         {
-            if (best_thread_finish == false)
-            {
-                std::vector<Neighbor> new_retset(L + 1);
-                SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, retsets[i], tmp_l, local_dist_comps);
-                new_retsets[i] = new_retset;
-            }
+            // if (best_thread_finish == false)
+            // {
+            //     std::vector<Neighbor> new_retset(L + 1);
+            //     SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, retsets[i], tmp_l, local_dist_comps);
+            //     new_retsets[i] = new_retset;
+            // }
         }
         dist_comps_per_thread[i] = local_dist_comps;
     }
@@ -942,16 +942,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                     break;
             }
     }
-    // for (size_t i = 0; i < new_retsets.size(); i++)
-    // {
-    //     if (new_retsets[i].size())
-    //         for (int j = 0; j < K; j++)
-    //         {
-    //             int pos = InsertIntoPool(retsets[best_thread_id].data(), K, new_retsets[i][j]);
-    //             if (pos == K)
-    //                 break;
-    //         }
-    // }
 #ifdef BREAKDOWN_ANALYSIS
     time_merge_ += get_time_mark();
 #endif
@@ -1153,7 +1143,7 @@ void ANNSearch::SearchUntilBestThreadStop(const float *query, unsigned query_id,
                 InsertIntoPool(retset.data(), tmp_l, main_retsets[i][idx]);
                 good_id_num++;
             }
-            if (good_id_num > 10)
+            if (good_id_num > 20)
             {
                 break;
             }
