@@ -654,9 +654,11 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 #ifdef BREAKDOWN_ANALYSIS
     time_expand_ -= get_time_mark();
 #endif
-#pragma omp parallel num_threads(num_threads)
+// #pragma omp parallel num_threads(num_threads)
+#pragma omp parallel for num_threads(num_threads)
+    for (int i = 0; i < num_threads; i++)
     {
-        int i = omp_get_thread_num();
+        // int i = omp_get_thread_num();
         int64_t local_dist_comps = 0;
         std::vector<unsigned> init_ids(L);
         unsigned tmp_l = 0;
@@ -808,9 +810,11 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     time_seq_ += get_time_mark();
     time_expand_ -= get_time_mark();
 #endif
-#pragma omp parallel num_threads(num_threads)
+// #pragma omp parallel num_threads(num_threads)
+#pragma omp parallel for num_threads(num_threads)
+    for (int i = 0; i < num_threads; i++)
     {
-        int i = omp_get_thread_num();
+        // int i = omp_get_thread_num();
         int hop = 0;
         int64_t local_dist_comps = 0;
         std::vector<unsigned> init_ids(L);
@@ -908,10 +912,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             else
                 ++k;
         }
-        // if (best_thread_id == i)
-        // {
-        //     best_thread_finish = true;
-        // }
         if (good_thread[i] == 1)
         {
             best_thread_finish = true;
@@ -944,11 +944,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 #ifdef BREAKDOWN_ANALYSIS
     time_merge_ += get_time_mark();
 #endif
-// for (int i = 0; i < num_threads; i++)
-// {
-//     std::cout << i << "," << good_thread[i] << std::endl;
-// }
-// std::cout << best_thread_id << std::endl;
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ -= get_time_mark();
 #endif
