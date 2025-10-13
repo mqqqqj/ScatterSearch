@@ -800,10 +800,10 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     int64_t dist_comps_per_thread[num_threads];
     // std::vector<unsigned> ep_list;
     // select_entry_points(30, num_threads, query, ep_list);
-    int election_hop = 50;
-    if (L < 50)
+    int election_hop = 200;
+    if (L <= election_hop)
     {
-        election_hop = L;
+        election_hop = L - 50;
     }
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
@@ -812,7 +812,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
 #pragma omp parallel num_threads(num_threads)
     {
         int i = omp_get_thread_num();
-        int hop = 0;
+        int hop = 1;
         int64_t local_dist_comps = 0;
         std::vector<unsigned> init_ids(L);
         bool need_identify = true;
