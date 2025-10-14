@@ -780,206 +780,13 @@ void ANNSearch::MultiThreadSearchArraySimulation(const float *query, unsigned qu
 #endif
 }
 
-// void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
-// {
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_seq_ -= get_time_mark();
-// #endif
-//     std::vector<std::vector<Neighbor>> retsets(num_threads);
-//     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
-//     int best_thread_id = -1;
-//     std::atomic<int> decide_num;
-//     decide_num = 0;
-//     std::atomic<float> best_dist;
-//     best_dist = 1000;
-//     std::atomic<bool> best_thread_finish;
-//     best_thread_finish = false;
-//     int good_thread[num_threads];
-//     memset(good_thread, 0, sizeof(int) * num_threads);
-//     bool is_reach_100hop[num_threads];
-//     memset(is_reach_100hop, 0, sizeof(bool) * num_threads);
-//     int64_t dist_comps_per_thread[num_threads];
-//     // std::vector<unsigned> ep_list;
-//     // select_entry_points(30, num_threads, query, ep_list);
-//     int election_hop = 50;
-//     // if (L <= election_hop)
-//     // {
-//     //     election_hop = L - 50;
-//     // }
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_seq_ += get_time_mark();
-//     time_expand_ -= get_time_mark();
-// #endif
-// // #pragma omp parallel num_threads(num_threads)
-// #pragma omp parallel for num_threads(num_threads)
-//     for (int i = 0; i < num_threads; i++)
-//     {
-//         // int i = omp_get_thread_num();
-//         int hop = 0;
-//         int64_t local_dist_comps = 0;
-//         std::vector<unsigned> init_ids(L);
-//         bool need_identify = true;
-//         unsigned tmp_l = 0;
-//         retsets[i].resize(L + 1);
-//         for (int j = 0; j < graph[default_ep].size(); j++)
-//         {
-//             if (j % num_threads == i)
-//             {
-//                 init_ids[tmp_l] = graph[default_ep][j];
-//                 flags[init_ids[tmp_l]] = true;
-//                 tmp_l++;
-//             }
-//         }
-//         // int ep = ep_list[i];
-//         // while (tmp_l < graph[ep].size())
-//         // {
-//         //     init_ids[tmp_l] = graph[ep][tmp_l];
-//         //     flags[init_ids[tmp_l]] = true;
-//         //     tmp_l++;
-//         // }
-//         for (unsigned j = 0; j < tmp_l; j++)
-//         {
-//             unsigned id = init_ids[j];
-//             float dist = distance_func(base_data + dimension * id, query, dimension);
-// #ifdef COLLECT_SEARCH_TREE
-//             search_tree[i].push_back(std::make_pair(id, default_ep));
-// #endif
-// #ifdef RECORD_DIST_COMPS
-//             local_dist_comps++;
-// #endif
-//             retsets[i][j] = Neighbor(id, dist, true);
-//         }
-//         std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
-//         int k = 0;
-//         while (k < (int)L)
-//         {
-//             int nk = L;
-//             if (best_thread_finish)
-//                 break;
-//             if (hop == election_hop)
-//             {
-//                 decide_num++;
-//                 is_reach_100hop[i] = true;
-//                 if (best_dist > retsets[i][K - 1].distance)
-//                 {
-//                     best_dist = retsets[i][K - 1].distance;
-//                     best_thread_id = i;
-//                 }
-//             }
-//             if (need_identify && decide_num == num_threads)
-//             {
-//                 need_identify = false;
-//                 if (best_dist < retsets[i][0].distance)
-//                 {
-//                     good_thread[i] = -1;
-//                     break;
-//                 }
-//                 else if (best_dist > retsets[i][0].distance)
-//                 {
-//                     good_thread[i] = 1;
-//                 }
-//             }
-//             if (retsets[i][k].unexplored)
-//             {
-//                 retsets[i][k].unexplored = false;
-//                 unsigned n = retsets[i][k].id;
-//                 for (unsigned m = 0; m < graph[n].size(); ++m)
-//                 {
-//                     unsigned id = graph[n][m];
-//                     if (flags[id])
-//                         continue;
-//                     flags[id] = true;
-//                     float dist = distance_func(query, base_data + dimension * id, dimension);
-// #ifdef COLLECT_SEARCH_TREE
-//                     search_tree[i].push_back(std::make_pair(id, n));
-// #endif
-// #ifdef RECORD_DIST_COMPS
-//                     local_dist_comps++;
-// #endif
-//                     if (dist >= retsets[i][tmp_l - 1].distance)
-//                         continue;
-//                     Neighbor nn(id, dist, true);
-//                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
-//                     if (tmp_l < L)
-//                         tmp_l++;
-//                     if (r < nk)
-//                         nk = r;
-//                 }
-//                 hop++;
-//             }
-//             if (nk <= k)
-//                 k = nk;
-//             else
-//                 ++k;
-//         }
-//         if (good_thread[i] == 1)
-//         {
-//             best_thread_finish = true;
-//         }
-//         else
-//         {
-//             // if (best_thread_finish == false)
-//             // {
-//             //     std::vector<Neighbor> new_retset(L + 1);
-//             //     SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, retsets[i], tmp_l, local_dist_comps);
-//             //     new_retsets[i] = new_retset;
-//             // }
-//         }
-//         dist_comps_per_thread[i] = local_dist_comps;
-//     }
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_expand_ += get_time_mark();
-//     time_merge_ -= get_time_mark();
-// #endif
-//     for (int i = 0; i < num_threads; i++)
-//     {
-//         if (i != best_thread_id)
-//             for (size_t j = 0; j < K; j++)
-//             {
-//                 int pos = InsertIntoPool(retsets[best_thread_id].data(), K, retsets[i][j]);
-//                 if (pos == K)
-//                     break;
-//             }
-//     }
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_merge_ += get_time_mark();
-// #endif
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_seq_ -= get_time_mark();
-// #endif
-//     for (size_t i = 0; i < K; i++)
-//     {
-//         indices[i] = retsets[best_thread_id][i].id;
-//     }
-//     flags.reset();
-// #ifdef RECORD_DIST_COMPS
-//     float mincomps = 1000000, maxcomps = 0;
-//     for (int i = 0; i < num_threads; i++)
-//     {
-//         dist_comps += dist_comps_per_thread[i];
-//         if (dist_comps_per_thread[i] < mincomps)
-//             mincomps = dist_comps_per_thread[i];
-//         if (dist_comps_per_thread[i] > maxcomps)
-//             maxcomps = dist_comps_per_thread[i];
-//     }
-//     max_dist_comps += maxcomps;
-//     ub_ratio += maxcomps / mincomps;
-// #endif
-// #ifdef BREAKDOWN_ANALYSIS
-//     time_seq_ += get_time_mark();
-// #endif
-// }
-
-// for small efs
 void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ -= get_time_mark();
 #endif
-
     std::vector<std::vector<Neighbor>> retsets(num_threads);
     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
-    std::vector<unsigned> retset_size(num_threads);
     int best_thread_id = -1;
     std::atomic<int> decide_num;
     decide_num = 0;
@@ -995,24 +802,25 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     // std::vector<unsigned> ep_list;
     // select_entry_points(30, num_threads, query, ep_list);
     int election_hop = 50;
-    if (L < 50)
-    {
-        election_hop = L;
-    }
+    // if (L <= election_hop)
+    // {
+    //     election_hop = L - 50;
+    // }
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ += get_time_mark();
     time_expand_ -= get_time_mark();
 #endif
+// #pragma omp parallel num_threads(num_threads)
 #pragma omp parallel for num_threads(num_threads)
     for (int i = 0; i < num_threads; i++)
     {
         // int i = omp_get_thread_num();
         int hop = 0;
         int64_t local_dist_comps = 0;
-        std::vector<unsigned> init_ids(K);
+        std::vector<unsigned> init_ids(L);
         bool need_identify = true;
         unsigned tmp_l = 0;
-        retsets[i].resize(K + 1);
+        retsets[i].resize(L + 1);
         for (int j = 0; j < graph[default_ep].size(); j++)
         {
             if (j % num_threads == i)
@@ -1029,15 +837,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
         //     flags[init_ids[tmp_l]] = true;
         //     tmp_l++;
         // }
-        while (tmp_l < 10)
-        {
-            unsigned id = rand() % base_num;
-            if (flags[id])
-                continue;
-            init_ids[tmp_l] = id;
-            flags[init_ids[tmp_l]] = true;
-            tmp_l++;
-        }
         for (unsigned j = 0; j < tmp_l; j++)
         {
             unsigned id = init_ids[j];
@@ -1061,9 +860,9 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             {
                 decide_num++;
                 is_reach_100hop[i] = true;
-                if (best_dist > retsets[i][9].distance)
+                if (best_dist > retsets[i][K - 1].distance)
                 {
-                    best_dist = retsets[i][9].distance;
+                    best_dist = retsets[i][K - 1].distance;
                     best_thread_id = i;
                 }
             }
@@ -1101,7 +900,7 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
                         continue;
                     Neighbor nn(id, dist, true);
                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
-                    if (tmp_l < K)
+                    if (tmp_l < L)
                         tmp_l++;
                     if (r < nk)
                         nk = r;
@@ -1113,25 +912,20 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
             else
                 ++k;
         }
-        // if (best_thread_id == i)
-        // {
-        //     best_thread_finish = true;
-        // }
         if (good_thread[i] == 1)
         {
             best_thread_finish = true;
         }
         else
         {
-            if (best_thread_finish == false)
-            {
-                // std::vector<Neighbor> new_retset;
-                // SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, new_retset, local_dist_comps);
-                // new_retsets[i] = new_retset;
-            }
+            // if (best_thread_finish == false)
+            // {
+            //     std::vector<Neighbor> new_retset(L + 1);
+            //     SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, retsets[i], tmp_l, local_dist_comps);
+            //     new_retsets[i] = new_retset;
+            // }
         }
         dist_comps_per_thread[i] = local_dist_comps;
-        retset_size[i] = tmp_l;
     }
 #ifdef BREAKDOWN_ANALYSIS
     time_expand_ += get_time_mark();
@@ -1140,18 +934,16 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     for (int i = 0; i < num_threads; i++)
     {
         if (i != best_thread_id)
-            for (size_t j = 0; j < retset_size[i]; j++)
+            for (size_t j = 0; j < K; j++)
             {
                 int pos = InsertIntoPool(retsets[best_thread_id].data(), K, retsets[i][j]);
                 if (pos == K)
                     break;
             }
     }
-
 #ifdef BREAKDOWN_ANALYSIS
     time_merge_ += get_time_mark();
 #endif
-
 #ifdef BREAKDOWN_ANALYSIS
     time_seq_ -= get_time_mark();
 #endif
@@ -1177,6 +969,214 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     time_seq_ += get_time_mark();
 #endif
 }
+
+// for small efs
+// void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsigned query_id, int K, int L, int num_threads, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
+// {
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_seq_ -= get_time_mark();
+// #endif
+
+//     std::vector<std::vector<Neighbor>> retsets(num_threads);
+//     std::vector<std::vector<Neighbor>> new_retsets(num_threads);
+//     std::vector<unsigned> retset_size(num_threads);
+//     int best_thread_id = -1;
+//     std::atomic<int> decide_num;
+//     decide_num = 0;
+//     std::atomic<float> best_dist;
+//     best_dist = 1000;
+//     std::atomic<bool> best_thread_finish;
+//     best_thread_finish = false;
+//     int good_thread[num_threads];
+//     memset(good_thread, 0, sizeof(int) * num_threads);
+//     bool is_reach_100hop[num_threads];
+//     memset(is_reach_100hop, 0, sizeof(bool) * num_threads);
+//     int64_t dist_comps_per_thread[num_threads];
+//     // std::vector<unsigned> ep_list;
+//     // select_entry_points(30, num_threads, query, ep_list);
+//     int election_hop = 50;
+//     if (L < 50)
+//     {
+//         election_hop = L;
+//     }
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_seq_ += get_time_mark();
+//     time_expand_ -= get_time_mark();
+// #endif
+// #pragma omp parallel for num_threads(num_threads)
+//     for (int i = 0; i < num_threads; i++)
+//     {
+//         // int i = omp_get_thread_num();
+//         int hop = 0;
+//         int64_t local_dist_comps = 0;
+//         std::vector<unsigned> init_ids(K);
+//         bool need_identify = true;
+//         unsigned tmp_l = 0;
+//         retsets[i].resize(K + 1);
+//         for (int j = 0; j < graph[default_ep].size(); j++)
+//         {
+//             if (j % num_threads == i)
+//             {
+//                 init_ids[tmp_l] = graph[default_ep][j];
+//                 flags[init_ids[tmp_l]] = true;
+//                 tmp_l++;
+//             }
+//         }
+//         // int ep = ep_list[i];
+//         // while (tmp_l < graph[ep].size())
+//         // {
+//         //     init_ids[tmp_l] = graph[ep][tmp_l];
+//         //     flags[init_ids[tmp_l]] = true;
+//         //     tmp_l++;
+//         // }
+//         while (tmp_l < 10)
+//         {
+//             unsigned id = rand() % base_num;
+//             if (flags[id])
+//                 continue;
+//             init_ids[tmp_l] = id;
+//             flags[init_ids[tmp_l]] = true;
+//             tmp_l++;
+//         }
+//         for (unsigned j = 0; j < tmp_l; j++)
+//         {
+//             unsigned id = init_ids[j];
+//             float dist = distance_func(base_data + dimension * id, query, dimension);
+// #ifdef COLLECT_SEARCH_TREE
+//             search_tree[i].push_back(std::make_pair(id, default_ep));
+// #endif
+// #ifdef RECORD_DIST_COMPS
+//             local_dist_comps++;
+// #endif
+//             retsets[i][j] = Neighbor(id, dist, true);
+//         }
+//         std::sort(retsets[i].begin(), retsets[i].begin() + tmp_l); // sort the retset by distance in ascending order
+//         int k = 0;
+//         while (k < (int)L)
+//         {
+//             int nk = L;
+//             if (best_thread_finish)
+//                 break;
+//             if (hop == election_hop)
+//             {
+//                 decide_num++;
+//                 is_reach_100hop[i] = true;
+//                 if (best_dist > retsets[i][9].distance)
+//                 {
+//                     best_dist = retsets[i][9].distance;
+//                     best_thread_id = i;
+//                 }
+//             }
+//             if (need_identify && decide_num == num_threads)
+//             {
+//                 need_identify = false;
+//                 if (best_dist < retsets[i][0].distance)
+//                 {
+//                     good_thread[i] = -1;
+//                     break;
+//                 }
+//                 else if (best_dist > retsets[i][0].distance)
+//                 {
+//                     good_thread[i] = 1;
+//                 }
+//             }
+//             if (retsets[i][k].unexplored)
+//             {
+//                 retsets[i][k].unexplored = false;
+//                 unsigned n = retsets[i][k].id;
+//                 for (unsigned m = 0; m < graph[n].size(); ++m)
+//                 {
+//                     unsigned id = graph[n][m];
+//                     if (flags[id])
+//                         continue;
+//                     flags[id] = true;
+//                     float dist = distance_func(query, base_data + dimension * id, dimension);
+// #ifdef COLLECT_SEARCH_TREE
+//                     search_tree[i].push_back(std::make_pair(id, n));
+// #endif
+// #ifdef RECORD_DIST_COMPS
+//                     local_dist_comps++;
+// #endif
+//                     if (dist >= retsets[i][tmp_l - 1].distance)
+//                         continue;
+//                     Neighbor nn(id, dist, true);
+//                     int r = InsertIntoPool(retsets[i].data(), tmp_l, nn);
+//                     if (tmp_l < K)
+//                         tmp_l++;
+//                     if (r < nk)
+//                         nk = r;
+//                 }
+//                 hop++;
+//             }
+//             if (nk <= k)
+//                 k = nk;
+//             else
+//                 ++k;
+//         }
+//         // if (best_thread_id == i)
+//         // {
+//         //     best_thread_finish = true;
+//         // }
+//         if (good_thread[i] == 1)
+//         {
+//             best_thread_finish = true;
+//         }
+//         else
+//         {
+//             if (best_thread_finish == false)
+//             {
+//                 // std::vector<Neighbor> new_retset;
+//                 // SearchUntilBestThreadStop(query, query_id, K, L, retsets, good_thread, is_reach_100hop, best_thread_finish, best_dist, flags, new_retset, local_dist_comps);
+//                 // new_retsets[i] = new_retset;
+//             }
+//         }
+//         dist_comps_per_thread[i] = local_dist_comps;
+//         retset_size[i] = tmp_l;
+//     }
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_expand_ += get_time_mark();
+//     time_merge_ -= get_time_mark();
+// #endif
+//     for (int i = 0; i < num_threads; i++)
+//     {
+//         if (i != best_thread_id)
+//             for (size_t j = 0; j < retset_size[i]; j++)
+//             {
+//                 int pos = InsertIntoPool(retsets[best_thread_id].data(), K, retsets[i][j]);
+//                 if (pos == K)
+//                     break;
+//             }
+//     }
+
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_merge_ += get_time_mark();
+// #endif
+
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_seq_ -= get_time_mark();
+// #endif
+//     for (size_t i = 0; i < K; i++)
+//     {
+//         indices[i] = retsets[best_thread_id][i].id;
+//     }
+//     flags.reset();
+// #ifdef RECORD_DIST_COMPS
+//     float mincomps = 1000000, maxcomps = 0;
+//     for (int i = 0; i < num_threads; i++)
+//     {
+//         dist_comps += dist_comps_per_thread[i];
+//         if (dist_comps_per_thread[i] < mincomps)
+//             mincomps = dist_comps_per_thread[i];
+//         if (dist_comps_per_thread[i] > maxcomps)
+//             maxcomps = dist_comps_per_thread[i];
+//     }
+//     max_dist_comps += maxcomps;
+//     ub_ratio += maxcomps / mincomps;
+// #endif
+// #ifdef BREAKDOWN_ANALYSIS
+//     time_seq_ += get_time_mark();
+// #endif
+// }
 
 void ANNSearch::MultiThreadSearchArraySimulationWithETTopM(const float *query, unsigned query_id, int K, int L, int num_threads, float percentage, boost::dynamic_bitset<> &flags, std::vector<unsigned> &indices)
 {
