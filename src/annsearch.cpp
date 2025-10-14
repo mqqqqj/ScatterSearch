@@ -943,13 +943,6 @@ void ANNSearch::MultiThreadSearchArraySimulationWithET(const float *query, unsig
     }
 #ifdef BREAKDOWN_ANALYSIS
     time_merge_ += get_time_mark();
-#endif
-// for (int i = 0; i < num_threads; i++)
-// {
-//     std::cout << i << "," << good_thread[i] << std::endl;
-// }
-// std::cout << best_thread_id << std::endl;
-#ifdef BREAKDOWN_ANALYSIS
     time_seq_ -= get_time_mark();
 #endif
     for (size_t i = 0; i < K; i++)
