@@ -45,10 +45,10 @@ int main(int argc, char **argv)
     load_groundtruth(argv[6], groundtruth);
     std::string dataset_name = argv[7];
     std::cout << "Groundtruth loaded" << std::endl;
-    if (query_num > 10000)
+    if (query_num > 1000)
     {
-        query_num = 10000;
-        std::cout << "only use first 10k queries" << std::endl;
+        query_num = 1000;
+        std::cout << "only use first 1k queries" << std::endl;
     }
     // 检查所有L值是否合法
     for (int L : L_list)
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
         std::vector<std::vector<unsigned>> res(query_num);
         std::vector<float> latency_list(query_num); // 单位：毫秒
         auto s = std::chrono::high_resolution_clock::now();
+#pragma omp parallel for num_threads(32) schedule(static)
         for (unsigned i = 0; i < query_num; i++)
         {
             std::vector<unsigned> tmp(K);

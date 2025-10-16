@@ -320,7 +320,7 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
         unsigned id = init_ids[j];
         _mm_prefetch(base_data + dimension * id, _MM_HINT_T0);
         float dist = distance_func(base_data + dimension * id, query, dimension);
-        dist_comps++;
+        // dist_comps++;
         retset[j] = Neighbor(id, dist, true);
     }
     std::sort(retset.begin(), retset.begin() + tmp_l); // sort the retset by distance in ascending order
@@ -345,7 +345,7 @@ void ANNSearch::SearchArraySimulation(const float *query, unsigned query_id, int
                     _mm_prefetch(base_data + dimension * graph[n][m + 1], _MM_HINT_T0);
                 }
                 float dist = distance_func(query, base_data + dimension * id, dimension);
-                dist_comps++;
+                // dist_comps++;
                 if (dist >= retset[tmp_l - 1].distance)
                     continue;
                 Neighbor nn(id, dist, true);
