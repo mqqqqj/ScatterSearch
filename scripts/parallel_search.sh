@@ -10,7 +10,7 @@ thread_num=32
 # "$L_str" 100 "$thread_num" /SSD/LAION/gt.test50K.bin "laion" | tee -a /home/mqj/proj/ANNSLib/experiments/ablation/laion_8t_ours_ws.csv
 
 
-L_list=(160 165 170 175 180) #glove
+L_list=(100 125 150 175 200 225 250 275 300 325 350 375 400 425 450 475 500 525 550 575 600 650 700 750 800 900 1000 1100 1200) #glove
 
 L_str=$(IFS=,; echo "${L_list[*]}")
 taskset -c 0-17,36-49 ./build/tests/parallel_search /SSD/Glove200/base.1m.fbin \
