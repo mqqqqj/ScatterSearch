@@ -51,14 +51,14 @@ int main(int argc, char **argv)
     std::cout << "Groundtruth loaded" << std::endl;
 
     // 检查所有L值是否合法
-    for (int L : L_list)
-    {
-        if (L < K)
-        {
-            std::cout << "search_L cannot be smaller than search_K!" << std::endl;
-            exit(-1);
-        }
-    }
+    // for (int L : L_list)
+    // {
+    //     if (L < K)
+    //     {
+    //         std::cout << "search_L cannot be smaller than search_K!" << std::endl;
+    //         exit(-1);
+    //     }
+    // }
 
     ANNSearch engine(dim, points_num, data_load, INNER_PRODUCT);
     engine.LoadGraph(argv[3]);
@@ -76,8 +76,8 @@ int main(int argc, char **argv)
         {
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
-            engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
+            // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, num_threads, flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();

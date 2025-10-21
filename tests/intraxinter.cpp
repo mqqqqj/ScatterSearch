@@ -9,6 +9,7 @@
 
 int main(int argc, char **argv)
 {
+    omp_set_nested(1);
     // 禁用core文件生成
     struct rlimit limit;
     limit.rlim_cur = 0;
@@ -81,12 +82,12 @@ int main(int argc, char **argv)
 #pragma omp parallel for num_threads(inter_num) schedule(static)
         for (unsigned i = 0; i < query_num; i++)
         {
-            int thread_id = omp_get_thread_num(); 
-            boost::dynamic_bitset<>& local_flags = flags_list[thread_id];
+            int thread_id = omp_get_thread_num();
+            boost::dynamic_bitset<> &local_flags = flags_list[thread_id];
             std::vector<unsigned> tmp(K);
             auto start_time = std::chrono::high_resolution_clock::now();
-            engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
-            // engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
+            // engine.MultiThreadSearchArraySimulation(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
+            engine.MultiThreadSearchArraySimulationWithET(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
             // engine.EdgeWiseMultiThreadSearch(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
             // engine.ModifiedDeltaStepping(query_load + (size_t)i * dim, i, K, L, intra_num, local_flags, tmp);
             auto end_time = std::chrono::high_resolution_clock::now();
