@@ -2,13 +2,12 @@ cd build && make -j && cd ..
 
 thread_num=8
 
-# L_list=(100 150 200 250 300 350 400 450 500 550 600 700 800 900 1000 1200 1400 1600) # laion
-L_list=(800 820 840 860 880 900 2100 2150 2200 2250 2300 2350) # laion
+L_list=(100 150 200 250 300 350 400 450 500 550 600 700 800 900 1000 1200 1400 1600) # laion
 L_str=$(IFS=,; echo "${L_list[*]}")
 taskset -c 0-$((thread_num - 1)) ./build/tests/parallel_search /SSD/LAION/LAION_base_imgemb_10M.fbin \
 /SSD/LAION/LAION_test_query_textemb_50k.fbin \
 /SSD/models/nsg/laion.L2000.R64.C2000.nsg \
-"$L_str" 100 "$thread_num" /SSD/LAION/gt.test50K.bin "laion" | tee -a /home/mqj/proj/ANNSLib/plot/laion_8t_edgewise.csv
+"$L_str" 100 "$thread_num" /SSD/LAION/gt.test50K.bin "laion" | tee -a ./laion_8t_scattersearch.csv
 
 
 # L_list=(100 125 150 175 200 225 250 275 300 325 350 375 400 425 450 475 500 525 550 575 600 650 700 750 800 900 1000 1100 1200) #glove

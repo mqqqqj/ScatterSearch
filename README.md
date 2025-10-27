@@ -1,6 +1,6 @@
 ## Introduction
 
-ScatterSearch
+ScatterSearch is a high-performance intra-query parallel graph-based ANNS algorithm.
 
 ## Prerequisites
 + AVX2
