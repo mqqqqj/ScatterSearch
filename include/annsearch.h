@@ -73,8 +73,6 @@ public:
 #endif
 private:
     double get_time_mark();
-    void select_entry_points(int pool_size, int P, const float *query, std::vector<unsigned> &selected_eps);
-
 public:
     unsigned default_ep;
     size_t dimension;
